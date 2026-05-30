@@ -7,6 +7,7 @@ export const XP = {
   QUEST:         100,
   SOCIAL:         50,
   ALL_QUESTS:    500,
+  VISIT_BOOTH:    25,
   CONTACT_STARTUP: 75,
   JOIN_MIG:      200,
   REDEEM_CODE:    25,

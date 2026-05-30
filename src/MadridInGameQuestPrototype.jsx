@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, MapPin, Gift, Star, QrCode, Users, CheckCircle2, Lock, ArrowLeft, Search, BadgeCheck, Sparkles, Ticket, Target, Crown, MessageCircleQuestion, Store, UserRound, Home, LayoutDashboard, Mail, Download, Save, Eye, Pencil, BarChart3, Phone } from 'lucide-react';
 import { usePlayer, XP } from './usePlayer';
+import QRCode from 'react-qr-code';
 import { useDashboard } from './useDashboard';
 import { useMigLeads } from './useMigLeads';
 import { supabase } from './supabase';
@@ -198,10 +199,31 @@ export default function MadridInGameQuestPrototype() {
   const [dashboardAuth, setDashboardAuth] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
 
-  const { player, completed, socialDone, actions, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact, submitJoinMig, hasAction, actionXp } = usePlayer();
+  const { player, completed, socialDone, actions, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact, submitJoinMig, hasAction, actionXp, recordAction } = usePlayer();
   const [contactStartupId, setContactStartupId] = useState(null);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [joinType, setJoinType] = useState(null);
+
+  // QR deep-link: ?startup=evveland → open that startup's quest page
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get('startup');
+    if (!sid) return;
+    const found = startups.find(s => s.id === sid);
+    if (!found) return;
+    setSelected(sid);
+    setScreen('startup');
+    // Record booth visit once player is loaded (may need a short wait)
+    const tryRecord = () => {
+      recordAction('visit_booth', sid, XP.VISIT_BOOTH);
+    };
+    if (player) {
+      tryRecord();
+    } else {
+      const t = setTimeout(tryRecord, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [player]);
 
   const completedCount = Object.keys(completed).length;
   const xp = XP.BASE
@@ -407,7 +429,7 @@ export default function MadridInGameQuestPrototype() {
                   <p className="text-cyan-200 mt-4 font-bold">{current.mission}</p>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
-                  <MiniTask icon={QrCode} title="Visit Booth" subtitle="Scan booth QR" done />
+                  <MiniTask icon={QrCode} title="Visit Booth" subtitle={`Scan QR · +${XP.VISIT_BOOTH} XP`} done={hasAction('visit_booth', current.id)} />
                   <MiniTask icon={MessageCircleQuestion} title="Ask Founder" subtitle={`+${current.xp} XP`} done={!!completed[current.id]} />
                   <MiniTask icon={Users} title="Social Task" subtitle={`Optional +${XP.SOCIAL} XP`} done={!!socialDone[current.id]} />
                   <MiniTask icon={Mail} title="Share Details" subtitle={`+${XP.CONTACT_STARTUP} XP`} done={hasAction('contact_startup', current.id)} />
@@ -1207,6 +1229,70 @@ function MigAdminScreen({ onSignOut }) {
   );
 }
 
+const APP_URL = 'https://project-2gjoz.vercel.app';
+
+function BoothQR({ startup }) {
+  const url = `${APP_URL}/?startup=${startup.id}`;
+
+  function downloadSVG() {
+    const svg = document.getElementById(`qr-${startup.id}`);
+    if (!svg) return;
+    const data = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([data], { type: 'image/svg+xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${startup.id}-booth-qr.svg`;
+    a.click();
+  }
+
+  return (
+    <div className="mt-5 rounded-3xl bg-white/10 border border-white/10 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-black text-xl">Booth QR Code</h3>
+          <p className="text-white/50 text-xs mt-0.5">Show this to visitors — scanning opens your quest.</p>
+        </div>
+        <button onClick={downloadSVG}
+          className="flex items-center gap-1.5 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-xs font-black active:scale-95 transition">
+          <Download size={14} /> SVG
+        </button>
+      </div>
+
+      <div className="flex flex-col items-center gap-4">
+        <div className={classNames('rounded-2xl p-5 bg-gradient-to-br relative overflow-hidden', startup.color)}>
+          <div className="absolute inset-0 bg-white/10" />
+          <div className="relative bg-white rounded-xl p-3 shadow-lg">
+            <QRCode
+              id={`qr-${startup.id}`}
+              value={url}
+              size={180}
+              bgColor="#ffffff"
+              fgColor="#0f172a"
+              level="M"
+            />
+          </div>
+        </div>
+
+        <div className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold mb-1">Booth URL</div>
+          <div className="text-xs font-mono text-cyan-300 break-all">{url}</div>
+        </div>
+
+        <div className="w-full grid grid-cols-2 gap-2 text-center">
+          <div className="rounded-2xl bg-black/20 border border-white/10 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Booth</div>
+            <div className="font-black text-sm mt-0.5">{startup.booth}</div>
+          </div>
+          <div className="rounded-2xl bg-black/20 border border-white/10 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">XP for visit</div>
+            <div className="font-black text-sm mt-0.5 text-cyan-300">+{XP.VISIT_BOOTH} XP</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Owns the useDashboard hook + the motion wrapper so StartupDashboard stays hook-free
 function DashboardScreen({ startup, startups, dashboardStartupId, setDashboardStartupId, onSignOut, locked }) {
   const db = useDashboard(startup);
@@ -1279,6 +1365,9 @@ function StartupDashboard({ startup, startups, dashboardStartupId, setDashboardS
         <DashboardStat icon={BarChart3}   label="Conv."   value={`${conversion}%`} />
         <DashboardStat icon={Users}       label="Hot"     value={hotLeads} />
       </div>
+
+      {/* ── Booth QR code ── */}
+      <BoothQR startup={startup} />
 
       {/* ── Editable profile ── */}
       <div className="mt-5 rounded-3xl bg-white/10 border border-white/10 p-5">
