@@ -253,11 +253,14 @@ export default function MadridInGameQuestPrototype() {
   }, [screen]);
 
   const completedCount = Object.keys(completed).length;
-  const xp = XP.BASE
+  const baseEarned = XP.BASE
     + completedCount * XP.QUEST
     + Object.keys(socialDone).length * XP.SOCIAL
-    + (completedCount === startups.length ? XP.ALL_QUESTS : 0)
-    + actionXp();
+    + (completedCount === startups.length ? XP.ALL_QUESTS : 0);
+  // earnedXp: total XP ever earned — used for leaderboard & TopBar (redeeming merch doesn't affect rank)
+  const earnedXp = baseEarned + actions.filter(a => a.xp_earned > 0).reduce((s, a) => s + a.xp_earned, 0);
+  // xp: available balance — deducts spent XP, used for store unlock checks
+  const xp = earnedXp + actions.filter(a => a.xp_earned < 0).reduce((s, a) => s + a.xp_earned, 0);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -331,7 +334,7 @@ export default function MadridInGameQuestPrototype() {
           <div className="absolute bottom-0 left-8 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl" />
         </div>
 
-        <TopBar xp={xp} completedCount={completedCount} telegramUser={telegramUser} />
+        <TopBar xp={earnedXp} completedCount={completedCount} telegramUser={telegramUser} />
 
         <div className="relative z-10 flex-1 overflow-y-auto">
           <AnimatePresence mode="wait">
@@ -612,8 +615,8 @@ export default function MadridInGameQuestPrototype() {
                 <h2 className="text-4xl font-black mt-6">Quest Complete!</h2>
                 <p className="text-white/70 mt-3">You discovered {current.name} and earned <span className="text-cyan-300 font-black">{current.xp} XP</span>.</p>
                 <div className="mt-6 rounded-3xl bg-white/10 border border-white/10 p-5">
-                  <div className="text-sm text-white/60">Current Balance</div>
-                  <div className="text-5xl font-black text-cyan-300 mt-1">{xp} XP</div>
+                  <div className="text-sm text-white/60">Total XP Earned</div>
+                  <div className="text-5xl font-black text-cyan-300 mt-1">{earnedXp} XP</div>
                 </div>
                 <button onClick={() => setScreen('map')} className="mt-6 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4">
                   Visit Next Startup
@@ -632,13 +635,17 @@ export default function MadridInGameQuestPrototype() {
 
                 {/* Balance */}
                 <div className="mt-5 rounded-3xl bg-cyan-400 text-slate-950 p-5">
-                  <div className="text-sm font-bold opacity-70">Available Balance</div>
-                  <div className="text-5xl font-black mt-1">{xp} XP</div>
-                  {Object.keys(redemptionCodes).length > 0 && (
-                    <div className="text-sm font-bold opacity-60 mt-1">
-                      {Object.values(redemptionCodes).reduce((s, r) => s + (r.reward_cost || 0), 0)} XP spent
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs font-bold opacity-60">Available to spend</div>
+                      <div className="text-4xl font-black mt-0.5">{xp}</div>
                     </div>
-                  )}
+                    <div className="text-right">
+                      <div className="text-xs font-bold opacity-60">Total earned</div>
+                      <div className="text-4xl font-black mt-0.5">{earnedXp}</div>
+                    </div>
+                  </div>
+                  <div className="text-xs font-bold opacity-50 mt-2">Spending XP doesn't affect your leaderboard rank</div>
                 </div>
 
                 {/* Per-reward cards */}
@@ -725,7 +732,7 @@ export default function MadridInGameQuestPrototype() {
                     <div className="text-2xl font-black w-8">#{myRank}</div>
                     <div className="flex-1">
                       <div className="font-black">You</div>
-                      <div className="text-slate-700 text-sm">{Object.keys(completed).length} quests · {xp} XP</div>
+                      <div className="text-slate-700 text-sm">{Object.keys(completed).length} quests · {earnedXp} XP</div>
                     </div>
                     <Trophy size={22} />
                   </div>
