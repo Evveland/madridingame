@@ -19,6 +19,7 @@ const startups = [
     answer: 'festival',
     accepted: ['festival', 'live event', 'event', 'cultural event'],
     socialTask: 'Scan their project QR or follow their social channel.',
+    pin: '1011',
   },
   {
     id: 'cyberzen',
@@ -34,6 +35,7 @@ const startups = [
     answer: 'calm',
     accepted: ['calm', 'stress', 'anxiety', 'focus', 'wellbeing'],
     socialTask: 'Follow Cyberzen or scan their demo QR.',
+    pin: '2727',
   },
   {
     id: 'gamestrategies',
@@ -49,6 +51,7 @@ const startups = [
     answer: 'leadership',
     accepted: ['leadership', 'teamwork', 'negotiation', 'strategy', 'compliance'],
     socialTask: 'Ask for a business card or scan the company QR.',
+    pin: '3636',
   },
   {
     id: 'neuhera',
@@ -64,6 +67,7 @@ const startups = [
     answer: 'ADHD',
     accepted: ['adhd', 'tdah', 'attention', 'attention deficit'],
     socialTask: "Scan Neuhera's demo QR at the booth.",
+    pin: '4545',
   },
   {
     id: 'unreality',
@@ -79,6 +83,7 @@ const startups = [
     answer: 'Japan',
     accepted: ['japan', 'japon', 'japón'],
     socialTask: 'Watch the short demo trailer at the booth.',
+    pin: '5454',
   },
   {
     id: 'cherrytree',
@@ -94,6 +99,7 @@ const startups = [
     answer: 'Project Node',
     accepted: ['project node', 'node'],
     socialTask: 'Ask to see one card or character from the game.',
+    pin: '6363',
   },
   {
     id: 'evveland',
@@ -109,6 +115,7 @@ const startups = [
     answer: 'Telegram',
     accepted: ['telegram', 'telegram miniapps', 'telegram mini apps'],
     socialTask: 'Open the Evveland demo MiniApp.',
+    pin: '7272',
   },
   {
     id: 'goldengamers',
@@ -124,6 +131,7 @@ const startups = [
     answer: 'seniors',
     accepted: ['seniors', 'older adults', 'elderly', 'mayores', 'older people'],
     socialTask: 'Ask to see one example of a senior-friendly game session.',
+    pin: '8181',
   },
   {
     id: 'nomoretrolls',
@@ -139,6 +147,7 @@ const startups = [
     answer: 'runner',
     accepted: ['runner', 'platform runner', 'third-person runner', 'platformer'],
     socialTask: 'Watch one gameplay clip at the booth.',
+    pin: '9090',
   },
   {
     id: 'xperiencesvr',
@@ -154,6 +163,7 @@ const startups = [
     answer: 'VR and AI',
     accepted: ['vr and ai', 'virtual reality and artificial intelligence', 'vr ai', 'ai and vr'],
     socialTask: 'Try or watch one VR training demo.',
+    pin: '0909',
   },
 ];
 
@@ -222,6 +232,7 @@ export default function MadridInGameQuestPrototype() {
   const [redeemed, setRedeemed] = useState(false);
   const [dashboardStartupId, setDashboardStartupId] = useState('evveland');
   const [savedDashboard, setSavedDashboard] = useState(false);
+  const [dashboardAuth, setDashboardAuth] = useState(null);
 
   const completedCount = Object.keys(completed).length;
   const xp = 50 + completedCount * 100 + Object.keys(socialDone).length * 50 + (completedCount === startups.length ? 500 : 0);
@@ -257,17 +268,19 @@ export default function MadridInGameQuestPrototype() {
 
   return (
     <div className="min-h-screen bg-[#060816] text-white flex justify-center">
-      <div className="w-full max-w-md min-h-screen bg-gradient-to-b from-[#111735] via-[#080b1a] to-black relative overflow-hidden shadow-2xl">
-        <div className="absolute -top-24 -left-24 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl" />
-        <div className="absolute top-48 -right-32 w-72 h-72 bg-fuchsia-500/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-8 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl" />
+      <div className="w-full max-w-md h-screen flex flex-col bg-gradient-to-b from-[#111735] via-[#080b1a] to-black relative shadow-2xl">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 -left-24 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl" />
+          <div className="absolute top-48 -right-32 w-72 h-72 bg-fuchsia-500/20 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-8 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl" />
+        </div>
 
-        <div className="relative z-10 min-h-screen pb-24">
-          <TopBar xp={xp} completedCount={completedCount} />
+        <TopBar xp={xp} completedCount={completedCount} />
 
+        <div className="relative z-10 flex-1 overflow-y-auto">
           <AnimatePresence mode="wait">
             {screen === 'splash' && (
-              <motion.div key="splash" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-10">
+              <motion.div key="splash" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-10 pb-6">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-xs text-cyan-100 mb-6">
                   <Sparkles size={14} /> South Summit Quest
                 </div>
@@ -297,7 +310,7 @@ export default function MadridInGameQuestPrototype() {
             )}
 
             {screen === 'onboarding' && (
-              <motion.div key="onboarding" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-5">
+              <motion.div key="onboarding" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-5 pb-6">
                 <h2 className="text-3xl font-black">Choose your player type</h2>
                 <p className="text-white/60 mt-2">This helps Madrid in Game understand who is discovering the ecosystem.</p>
                 <div className="mt-6 space-y-3">
@@ -319,7 +332,7 @@ export default function MadridInGameQuestPrototype() {
             )}
 
             {screen === 'map' && (
-              <motion.div key="map" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4">
+              <motion.div key="map" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <h2 className="text-3xl font-black">Mission Map</h2>
@@ -353,7 +366,7 @@ export default function MadridInGameQuestPrototype() {
             )}
 
             {screen === 'startup' && current && (
-              <motion.div key="startup" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="px-5 pt-4">
+              <motion.div key="startup" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="px-5 pt-4 pb-6">
                 <Back onClick={() => setScreen('map')} />
                 <div className={classNames('mt-4 h-36 rounded-3xl bg-gradient-to-br p-5 shadow-xl relative overflow-hidden', current.color)}>
                   <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/20 rounded-full blur-xl" />
@@ -400,7 +413,7 @@ export default function MadridInGameQuestPrototype() {
             )}
 
             {screen === 'question' && current && (
-              <motion.div key="question" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="px-5 pt-4">
+              <motion.div key="question" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="px-5 pt-4 pb-6">
                 <Back onClick={() => setScreen('startup')} />
                 <div className="mt-6 rounded-3xl bg-white/10 border border-white/10 p-6">
                   <div className="w-14 h-14 rounded-2xl bg-cyan-400 text-slate-950 flex items-center justify-center mb-5">
@@ -434,7 +447,7 @@ export default function MadridInGameQuestPrototype() {
             )}
 
             {screen === 'success' && current && (
-              <motion.div key="success" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="px-5 pt-12 text-center">
+              <motion.div key="success" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="px-5 pt-12 pb-6 text-center">
                 <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 180, damping: 12 }} className="mx-auto w-24 h-24 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/30">
                   <CheckCircle2 size={54} />
                 </motion.div>
@@ -454,7 +467,7 @@ export default function MadridInGameQuestPrototype() {
             )}
 
             {screen === 'store' && (
-              <motion.div key="store" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4">
+              <motion.div key="store" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
                 <Back onClick={() => setScreen('map')} />
                 <h2 className="text-3xl font-black mt-4">XP Store</h2>
                 <p className="text-white/60 mt-1">Redeem XP for Madrid in Game merch at the booth.</p>
@@ -494,7 +507,7 @@ export default function MadridInGameQuestPrototype() {
             )}
 
             {screen === 'leaderboard' && (
-              <motion.div key="leaderboard" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4">
+              <motion.div key="leaderboard" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
                 <h2 className="text-3xl font-black">Leaderboard</h2>
                 <p className="text-white/60 mt-1">Top South Summit explorers today.</p>
                 <div className="mt-6 space-y-3">
@@ -518,6 +531,18 @@ export default function MadridInGameQuestPrototype() {
               </motion.div>
             )}
 
+            {screen === 'pin' && (
+              <PinPad
+                onSuccess={(startupId) => {
+                  setDashboardAuth(startupId);
+                  setDashboardStartupId(startupId);
+                  setSavedDashboard(false);
+                  setScreen('dashboard');
+                }}
+                onBack={() => setScreen('splash')}
+              />
+            )}
+
             {screen === 'dashboard' && (
               <StartupDashboard
                 startup={dashboardStartup}
@@ -533,12 +558,17 @@ export default function MadridInGameQuestPrototype() {
                   setSavedDashboard(true);
                   setTimeout(() => setSavedDashboard(false), 1800);
                 }}
+                onSignOut={() => {
+                  setDashboardAuth(null);
+                  setScreen('splash');
+                }}
+                locked={!!dashboardAuth}
               />
             )}
           </AnimatePresence>
         </div>
 
-        <BottomNav screen={screen} setScreen={setScreen} />
+        <BottomNav screen={screen} setScreen={setScreen} dashboardAuth={dashboardAuth} />
       </div>
     </div>
   );
@@ -548,7 +578,7 @@ export default function MadridInGameQuestPrototype() {
 
 function TopBar({ xp, completedCount }) {
   return (
-    <div className="relative z-20 px-5 pt-4 flex items-center justify-between">
+    <div className="relative z-20 shrink-0 px-5 pt-4 pb-2 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <div className="w-12 h-12 rounded-2xl bg-[#1f2020] border border-white/10 flex items-center justify-center overflow-hidden">
           <img src={MIG_LOGO} alt="Madrid in Game official logo" className="w-11 h-11 object-cover" />
@@ -569,7 +599,7 @@ function TopBar({ xp, completedCount }) {
   );
 }
 
-function BottomNav({ screen, setScreen }) {
+function BottomNav({ screen, setScreen, dashboardAuth }) {
   const items = [
     ['splash', Home, 'Home'],
     ['map', Target, 'Quests'],
@@ -577,11 +607,19 @@ function BottomNav({ screen, setScreen }) {
     ['leaderboard', Trophy, 'Rank'],
     ['dashboard', LayoutDashboard, 'Startup'],
   ];
+  function handleNav(id) {
+    if (id === 'dashboard') {
+      setScreen(dashboardAuth ? 'dashboard' : 'pin');
+    } else {
+      setScreen(id);
+    }
+  }
+  const activeId = screen === 'pin' ? 'dashboard' : screen;
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 p-4">
+    <div className="relative z-30 p-4 shrink-0">
       <div className="rounded-3xl bg-black/70 backdrop-blur-xl border border-white/10 p-2 grid grid-cols-5 gap-1 shadow-2xl">
         {items.map(([id, Icon, label]) => (
-          <button key={id} onClick={() => setScreen(id)} className={classNames('rounded-2xl py-3 flex flex-col items-center gap-1 text-xs font-bold transition', screen === id ? 'bg-cyan-400 text-slate-950' : 'text-white/60')}>
+          <button key={id} onClick={() => handleNav(id)} className={classNames('rounded-2xl py-3 flex flex-col items-center gap-1 text-xs font-bold transition', activeId === id ? 'bg-cyan-400 text-slate-950' : 'text-white/60')}>
             <Icon size={20} />
             {label}
           </button>
@@ -660,14 +698,106 @@ function MiniTask({ icon: Icon, title, subtitle, done }) {
   );
 }
 
-function StartupDashboard({ startup, contacts, startups, dashboardStartupId, setDashboardStartupId, savedDashboard, onSave }) {
+function PinPad({ onSuccess, onBack }) {
+  const [digits, setDigits] = useState([]);
+  const [error, setError] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  function press(d) {
+    if (digits.length >= 4) return;
+    const next = [...digits, d];
+    setDigits(next);
+    setError(false);
+    if (next.length === 4) {
+      const code = next.join('');
+      const match = startups.find((s) => s.pin === code);
+      if (match) {
+        onSuccess(match.id);
+      } else {
+        setShake(true);
+        setError(true);
+        setTimeout(() => { setDigits([]); setShake(false); }, 700);
+      }
+    }
+  }
+
+  function backspace() {
+    setDigits((d) => d.slice(0, -1));
+    setError(false);
+  }
+
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', null, '0', '⌫'];
+
+  return (
+    <motion.div key="pin" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
+      <Back onClick={onBack} />
+      <div className="mt-8 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-cyan-400/10 border border-cyan-300/20 flex items-center justify-center mx-auto mb-6">
+          <Lock size={28} className="text-cyan-300" />
+        </div>
+        <h2 className="text-3xl font-black">Startup Access</h2>
+        <p className="text-white/60 mt-2 text-sm">Enter your 4-digit booth access code</p>
+      </div>
+
+      <motion.div
+        animate={shake ? { x: [0, -10, 10, -10, 10, 0] } : {}}
+        transition={{ duration: 0.4 }}
+        className="flex justify-center gap-5 mt-10"
+      >
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className={classNames(
+              'w-5 h-5 rounded-full border-2 transition-all duration-150',
+              digits.length > i
+                ? error ? 'bg-rose-400 border-rose-400' : 'bg-cyan-400 border-cyan-400 scale-110'
+                : 'border-white/30 bg-transparent'
+            )}
+          />
+        ))}
+      </motion.div>
+
+      {error && (
+        <p className="text-center text-rose-300 text-sm mt-4 font-semibold">Wrong code — try again</p>
+      )}
+
+      <div className="mt-8 grid grid-cols-3 gap-3 px-4">
+        {keys.map((k, i) =>
+          k === null ? (
+            <div key={i} />
+          ) : k === '⌫' ? (
+            <button
+              key={i}
+              onClick={backspace}
+              className="rounded-2xl py-5 flex items-center justify-center bg-white/5 border border-white/10 text-white/50 active:scale-95 transition"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          ) : (
+            <button
+              key={i}
+              onClick={() => press(k)}
+              className="rounded-2xl py-5 text-2xl font-black text-center bg-white/10 border border-white/10 active:scale-95 active:bg-white/20 transition"
+            >
+              {k}
+            </button>
+          )
+        )}
+      </div>
+
+      <p className="text-center text-white/30 text-xs mt-8">Your access code was provided by Madrid in Game</p>
+    </motion.div>
+  );
+}
+
+function StartupDashboard({ startup, contacts, startups, dashboardStartupId, setDashboardStartupId, savedDashboard, onSave, onSignOut, locked }) {
   const questViews = 42 + contacts.length * 11;
   const completions = 18 + contacts.length * 4;
   const conversion = Math.round((completions / questViews) * 100);
   const hotLeads = contacts.filter((c) => c.status === 'Hot lead').length;
 
   return (
-    <motion.div key="dashboard" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4">
+    <motion.div key="dashboard" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/10 border border-cyan-300/20 text-xs text-cyan-100 mb-3">
@@ -676,22 +806,32 @@ function StartupDashboard({ startup, contacts, startups, dashboardStartupId, set
           <h2 className="text-3xl font-black">Startup Dashboard</h2>
           <p className="text-white/60 mt-1">Manage profile data, quest info and event contacts.</p>
         </div>
+        {locked && (
+          <button
+            onClick={onSignOut}
+            className="shrink-0 mt-1 flex items-center gap-1.5 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-xs font-bold text-white/60 active:scale-95 transition"
+          >
+            <Lock size={13} /> Sign out
+          </button>
+        )}
       </div>
 
-      <div className="mt-5 rounded-3xl bg-white/10 border border-white/10 p-4">
-        <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Select startup</label>
-        <select
-          value={dashboardStartupId}
-          onChange={(e) => setDashboardStartupId(e.target.value)}
-          className="mt-2 w-full rounded-2xl bg-black/40 border border-white/10 px-4 py-3 outline-none font-bold"
-        >
-          {[...startups]
-            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
-            .map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-        </select>
-      </div>
+      {!locked && (
+        <div className="mt-5 rounded-3xl bg-white/10 border border-white/10 p-4">
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Select startup</label>
+          <select
+            value={dashboardStartupId}
+            onChange={(e) => setDashboardStartupId(e.target.value)}
+            className="mt-2 w-full rounded-2xl bg-black/40 border border-white/10 px-4 py-3 outline-none font-bold"
+          >
+            {[...startups]
+              .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+              .map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+          </select>
+        </div>
+      )}
 
       <div className={classNames('mt-5 rounded-3xl bg-gradient-to-br p-5 shadow-xl relative overflow-hidden', startup.color)}>
         <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/20 rounded-full blur-xl" />
