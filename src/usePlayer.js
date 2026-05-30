@@ -49,7 +49,7 @@ export function usePlayer() {
   const [completed, setCompleted]         = useState({});
   const [socialDone, setSocialDone]       = useState({});
   const [actions, setActions]             = useState([]);
-  const [redemptionCode, setRedemptionCode] = useState(null);
+  const [redemptionCodes, setRedemptionCodes] = useState({}); // { [reward_name]: row }
   const [loading, setLoading]             = useState(true);
   const playerRef = useRef(null);
 
@@ -80,7 +80,7 @@ export function usePlayer() {
     const [{ data: qc }, { data: sc }, { data: rc }, { data: pa }] = await Promise.all([
       supabase.from('quest_completions').select('startup_id').eq('player_id', p.id),
       supabase.from('social_completions').select('startup_id').eq('player_id', p.id),
-      supabase.from('redemption_codes').select('code,xp,used').eq('player_id', p.id).limit(1).maybeSingle(),
+      supabase.from('redemption_codes').select('code,xp,used,used_at,reward_name,reward_cost').eq('player_id', p.id),
       supabase.from('player_actions').select('action_type,reference_id,xp_earned').eq('player_id', p.id),
     ]);
 
@@ -92,7 +92,11 @@ export function usePlayer() {
     sc?.forEach(r => { sMap[r.startup_id] = true; });
     setSocialDone(sMap);
 
-    if (rc) setRedemptionCode(rc);
+    if (rc) {
+      const map = {};
+      rc.forEach(r => { if (r.reward_name) map[r.reward_name] = r; });
+      setRedemptionCodes(map);
+    }
     setActions(pa || []);
 
     setLoading(false);
@@ -140,21 +144,23 @@ export function usePlayer() {
     setPlayer(prev => ({ ...prev, profile: profileValue }));
   }
 
-  async function generateRedemptionCode(xp) {
+  // reward = { name, xp } — generates a code and deducts xp from the player
+  async function generateRedemptionCode(reward) {
     const p = playerRef.current;
     if (!p) return null;
-    if (redemptionCode) return redemptionCode;
+    if (redemptionCodes[reward.name]) return redemptionCodes[reward.name];
 
     for (let i = 0; i < 2; i++) {
       const code = makeCode();
       const { data, error } = await supabase
         .from('redemption_codes')
-        .insert({ player_id: p.id, xp, code })
-        .select('code,xp,used')
+        .insert({ player_id: p.id, xp: reward.xp, code, reward_name: reward.name, reward_cost: reward.xp })
+        .select('code,xp,used,used_at,reward_name,reward_cost')
         .single();
       if (!error && data) {
-        setRedemptionCode(data);
-        await recordAction('redeem_code', 'global', XP.REDEEM_CODE);
+        setRedemptionCodes(prev => ({ ...prev, [reward.name]: data }));
+        // Deduct the reward cost from XP balance
+        await recordAction('spend_xp', reward.name, -reward.xp);
         return data;
       }
     }
@@ -187,7 +193,7 @@ export function usePlayer() {
     completed,
     socialDone,
     actions,
-    redemptionCode,
+    redemptionCodes,
     loading,
     completeQuest,
     completeSocial,

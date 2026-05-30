@@ -194,16 +194,15 @@ export default function MadridInGameQuestPrototype() {
   const [answers, setAnswers] = useState({});
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
-  const [redeemed, setRedeemed] = useState(false);
+  const [generatingReward, setGeneratingReward] = useState(null); // reward name being generated
   const [dashboardStartupId, setDashboardStartupId] = useState('evveland');
   const [dashboardAuth, setDashboardAuth] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
   const [myRank, setMyRank]           = useState(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
-  const { player, telegramUser, completed, socialDone, actions, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact, submitJoinMig, hasAction, actionXp, recordAction } = usePlayer();
+  const { player, telegramUser, completed, socialDone, actions, redemptionCodes, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact, submitJoinMig, hasAction, actionXp, recordAction } = usePlayer();
   const [contactStartupId, setContactStartupId] = useState(null);
-  const [generatingCode, setGeneratingCode] = useState(false);
   const [joinType, setJoinType] = useState(null);
   const [currentSocialLinks, setCurrentSocialLinks] = useState({});
 
@@ -629,54 +628,77 @@ export default function MadridInGameQuestPrototype() {
               <motion.div key="store" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
                 <Back onClick={() => setScreen('map')} />
                 <h2 className="text-3xl font-black mt-4">XP Store</h2>
-                <p className="text-white/60 mt-1">Redeem XP for Madrid in Game merch at the booth.</p>
+                <p className="text-white/60 mt-1">Spend your XP on Madrid in Game merch.</p>
+
+                {/* Balance */}
                 <div className="mt-5 rounded-3xl bg-cyan-400 text-slate-950 p-5">
-                  <div className="text-sm font-bold opacity-70">Your Balance</div>
+                  <div className="text-sm font-bold opacity-70">Available Balance</div>
                   <div className="text-5xl font-black mt-1">{xp} XP</div>
+                  {Object.keys(redemptionCodes).length > 0 && (
+                    <div className="text-sm font-bold opacity-60 mt-1">
+                      {Object.values(redemptionCodes).reduce((s, r) => s + (r.reward_cost || 0), 0)} XP spent
+                    </div>
+                  )}
                 </div>
+
+                {/* Per-reward cards */}
                 <div className="mt-5 space-y-3">
                   {rewards.map((r) => {
                     const Icon = r.icon;
-                    const unlocked = xp >= r.xp;
+                    const code = redemptionCodes[r.name];
+                    const canAfford = xp >= r.xp;
+                    const isGenerating = generatingReward === r.name;
                     return (
-                      <div key={r.name} className={classNames('rounded-2xl p-4 border flex items-center gap-4', unlocked ? 'bg-white/15 border-cyan-300/40' : 'bg-white/5 border-white/10 opacity-60')}>
-                        <div className={classNames('w-12 h-12 rounded-2xl flex items-center justify-center', unlocked ? 'bg-cyan-400 text-slate-950' : 'bg-white/10')}>
-                          {unlocked ? <Icon size={24} /> : <Lock size={22} />}
+                      <div key={r.name} className={classNames('rounded-2xl border overflow-hidden', code ? (code.used ? 'bg-white/5 border-white/10' : 'bg-white/15 border-cyan-300/30') : canAfford ? 'bg-white/10 border-white/10' : 'bg-white/5 border-white/5 opacity-50')}>
+                        {/* Reward header row */}
+                        <div className="flex items-center gap-4 p-4">
+                          <div className={classNames('w-12 h-12 rounded-2xl flex items-center justify-center shrink-0', code ? 'bg-cyan-400 text-slate-950' : canAfford ? 'bg-cyan-400/20 text-cyan-300' : 'bg-white/10 text-white/30')}>
+                            {code ? <CheckCircle2 size={22} /> : canAfford ? <Icon size={24} /> : <Lock size={22} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-black">{r.name}</div>
+                            <div className="text-xs text-white/50 mt-0.5">{r.xp} XP</div>
+                          </div>
+                          {/* Action */}
+                          {code ? (
+                            <span className={classNames('text-xs font-black px-2 py-1 rounded-full', code.used ? 'bg-white/10 text-white/40' : 'bg-emerald-400 text-slate-950')}>
+                              {code.used ? 'Redeemed' : 'Active'}
+                            </span>
+                          ) : canAfford ? (
+                            <button
+                              disabled={isGenerating}
+                              onClick={async () => {
+                                setGeneratingReward(r.name);
+                                await generateRedemptionCode(r);
+                                setGeneratingReward(null);
+                              }}
+                              className="shrink-0 rounded-xl bg-cyan-400 text-slate-950 font-black px-3 py-2 text-xs active:scale-95 transition disabled:opacity-50"
+                            >
+                              {isGenerating ? '…' : 'Get Code'}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-white/30 font-bold">{r.xp - xp} XP needed</span>
+                          )}
                         </div>
-                        <div className="flex-1">
-                          <div className="font-black">{r.name}</div>
-                          <div className="text-sm text-white/60">{r.xp} XP required</div>
-                        </div>
-                        {unlocked && <span className="text-xs font-black text-cyan-200">UNLOCKED</span>}
+
+                        {/* Generated code display */}
+                        {code && (
+                          <div className={classNames('mx-4 mb-4 rounded-xl p-3 text-center', code.used ? 'bg-white/5' : 'bg-white text-slate-950')}>
+                            <div className="text-[10px] uppercase tracking-widest font-bold opacity-50 mb-1">
+                              {code.used ? `Redeemed ${code.used_at?.slice(0, 10)}` : 'Show this at the merch booth'}
+                            </div>
+                            <div className={classNames('text-2xl font-black tracking-widest font-mono', code.used ? 'text-white/30 line-through' : 'text-slate-950')}>
+                              {code.code}
+                            </div>
+                            {!code.used && (
+                              <div className="mt-2 text-xs font-bold text-slate-500">Staff will mark it used when merch is collected</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-                {!redemptionCode ? (
-                  <button
-                    disabled={xp < 300 || generatingCode}
-                    onClick={async () => {
-                      setGeneratingCode(true);
-                      await generateRedemptionCode(xp);
-                      setGeneratingCode(false);
-                    }}
-                    className={classNames('mt-5 w-full rounded-2xl font-black py-4 transition', xp >= 300 ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/30 active:scale-[0.98]' : 'bg-white/10 text-white/40')}
-                  >
-                    {generatingCode ? 'Generating…' : xp >= 300 ? 'Generate Redemption Code' : `${300 - xp} XP to unlock`}
-                  </button>
-                ) : (
-                  <div className="mt-5 rounded-3xl bg-white text-slate-950 p-6 text-center">
-                    <QrCode className="mx-auto" size={86} />
-                    <div className="mt-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Show this at the booth</div>
-                    <div className="text-3xl font-black mt-1 tracking-widest">{redemptionCode.code}</div>
-                    <div className="mt-3 text-sm font-bold text-slate-500">{redemptionCode.xp} XP · {redemptionCode.used ? '✓ Redeemed' : 'Not yet redeemed'}</div>
-                    {redemptionCode.used && (
-                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">
-                        <CheckCircle2 size={13} /> Code used — merch collected!
-                      </div>
-                    )}
-                  </div>
-                )}
               </motion.div>
             )}
 
