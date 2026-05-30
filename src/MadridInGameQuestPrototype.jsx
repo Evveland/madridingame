@@ -63,7 +63,7 @@ const startups = [
     question: 'Ask the founder: What child-development challenge is Neuhera focused on?',
     answer: 'ADHD',
     accepted: ['adhd', 'tdah', 'attention', 'attention deficit'],
-    socialTask: 'Scan Neuhera's demo QR at the booth.',
+    socialTask: "Scan Neuhera's demo QR at the booth.",
   },
   {
     id: 'unreality',
@@ -74,7 +74,7 @@ const startups = [
     xp: 100,
     color: 'from-red-500 to-rose-600',
     description: 'A platform, puzzle and survival game world inspired by atmospheric environments.',
-    mission: 'Explore the world behind Unreality's game concept.',
+    mission: "Explore the world behind Unreality's game concept.",
     question: 'Ask the founder: What country inspired the world of Unreality?',
     answer: 'Japan',
     accepted: ['japan', 'japon', 'japón'],
