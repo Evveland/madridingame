@@ -197,6 +197,8 @@ export default function MadridInGameQuestPrototype() {
   const [dashboardStartupId, setDashboardStartupId] = useState('evveland');
   const [dashboardAuth, setDashboardAuth] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
+  const [myRank, setMyRank]           = useState(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
   const { player, completed, socialDone, actions, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact, submitJoinMig, hasAction, actionXp, recordAction } = usePlayer();
   const [contactStartupId, setContactStartupId] = useState(null);
@@ -236,6 +238,20 @@ export default function MadridInGameQuestPrototype() {
     }
   }, [player]);
 
+  // Live leaderboard: re-fetch whenever anyone completes a quest
+  useEffect(() => {
+    const channel = supabase
+      .channel('leaderboard-updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quest_completions' }, () => {
+        if (screen === 'leaderboard') fetchLeaderboard();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'player_actions' }, () => {
+        if (screen === 'leaderboard') fetchLeaderboard();
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [screen]);
+
   const completedCount = Object.keys(completed).length;
   const xp = XP.BASE
     + completedCount * XP.QUEST
@@ -273,12 +289,37 @@ export default function MadridInGameQuestPrototype() {
   }
 
   async function fetchLeaderboard() {
-    const { data } = await supabase
-      .from('leaderboard')
-      .select('*')
-      .order('xp', { ascending: false })
-      .limit(10);
-    setLeaderboard(data || []);
+    setLeaderboardLoading(true);
+    try {
+      // Top 20 — only players who've earned XP beyond the base
+      const { data } = await supabase
+        .from('leaderboard')
+        .select('*')
+        .gt('xp', 50)
+        .order('xp', { ascending: false })
+        .limit(20);
+      const rows = data || [];
+      setLeaderboard(rows);
+
+      // Find my rank in the full board (even if outside top 20)
+      if (player) {
+        const myIdx = rows.findIndex(r => r.player_id === player.id);
+        if (myIdx >= 0) {
+          setMyRank(myIdx + 1);
+        } else {
+          // I'm outside top 20 — fetch my exact position
+          const { data: full } = await supabase
+            .from('leaderboard')
+            .select('player_id')
+            .gt('xp', 50)
+            .order('xp', { ascending: false });
+          const pos = (full || []).findIndex(r => r.player_id === player.id);
+          setMyRank(pos >= 0 ? pos + 1 : null);
+        }
+      }
+    } finally {
+      setLeaderboardLoading(false);
+    }
   }
 
   return (
@@ -640,29 +681,94 @@ export default function MadridInGameQuestPrototype() {
 
             {screen === 'leaderboard' && (
               <motion.div key="leaderboard" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
-                <h2 className="text-3xl font-black">Leaderboard</h2>
-                <p className="text-white/60 mt-1">Top South Summit explorers today.</p>
-                <div className="mt-6 space-y-3">
-                  {leaderboard === null ? (
-                    <p className="text-white/40 text-sm text-center py-8">Loading…</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-3xl font-black">Leaderboard</h2>
+                    <p className="text-white/60 mt-1 text-sm">Top South Summit Quest explorers</p>
+                  </div>
+                  <button
+                    onClick={fetchLeaderboard}
+                    disabled={leaderboardLoading}
+                    className="flex items-center gap-1.5 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-xs font-bold active:scale-95 transition disabled:opacity-40"
+                  >
+                    <Sparkles size={13} className={leaderboardLoading ? 'animate-spin' : ''} />
+                    {leaderboardLoading ? 'Loading…' : 'Refresh'}
+                  </button>
+                </div>
+
+                {/* My position card — always visible if I have XP > base */}
+                {player && xp > 50 && myRank && !leaderboard?.slice(0, 20).find(r => r.player_id === player.id) && (
+                  <div className="mt-4 rounded-2xl bg-cyan-400 text-slate-950 p-4 flex items-center gap-4">
+                    <div className="text-2xl font-black w-8">#{myRank}</div>
+                    <div className="flex-1">
+                      <div className="font-black">You</div>
+                      <div className="text-slate-700 text-sm">{Object.keys(completed).length} quests · {xp} XP</div>
+                    </div>
+                    <Trophy size={22} />
+                  </div>
+                )}
+
+                <div className="mt-4 space-y-2">
+                  {leaderboard === null || leaderboardLoading ? (
+                    <div className="text-white/40 text-sm text-center py-12">
+                      <Sparkles size={24} className="mx-auto mb-3 animate-pulse text-cyan-400/50" />
+                      Loading rankings…
+                    </div>
                   ) : leaderboard.length === 0 ? (
-                    <p className="text-white/40 text-sm text-center py-8">No players yet — be the first!</p>
+                    <div className="text-center py-12">
+                      <Trophy size={40} className="mx-auto text-white/20 mb-3" />
+                      <p className="text-white/50 font-black">No scores yet</p>
+                      <p className="text-white/30 text-sm mt-1">Complete quests to appear here</p>
+                    </div>
                   ) : (
                     leaderboard.map((row, i) => {
                       const isMe = player && row.player_id === player.id;
+                      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null;
                       return (
-                        <div key={row.player_id} className={classNames('rounded-2xl p-4 border flex items-center gap-4', isMe ? 'bg-cyan-400 text-slate-950 border-cyan-300' : 'bg-white/10 border-white/10')}>
-                          <div className="text-2xl font-black w-8">#{i + 1}</div>
-                          <div className="flex-1">
-                            <div className="font-black">{isMe ? 'You' : (row.profile || 'Explorer')}</div>
-                            <div className={classNames('text-sm', isMe ? 'text-slate-700' : 'text-white/60')}>{row.quests_completed} startups visited</div>
+                        <div
+                          key={row.player_id}
+                          className={classNames(
+                            'rounded-2xl p-4 border flex items-center gap-3 transition',
+                            isMe
+                              ? 'bg-cyan-400 text-slate-950 border-cyan-300 shadow-lg shadow-cyan-500/20'
+                              : i < 3
+                                ? 'bg-white/15 border-white/20'
+                                : 'bg-white/10 border-white/10'
+                          )}
+                        >
+                          {/* Rank */}
+                          <div className="w-9 shrink-0 text-center">
+                            {medal
+                              ? <span className="text-2xl">{medal}</span>
+                              : <span className={classNames('text-lg font-black', isMe ? 'text-slate-950' : 'text-white/50')}>#{i + 1}</span>
+                            }
                           </div>
-                          <div className="font-black">{row.xp} XP</div>
+
+                          {/* Player info */}
+                          <div className="flex-1 min-w-0">
+                            <div className={classNames('font-black truncate', isMe ? 'text-slate-950' : 'text-white')}>
+                              {isMe ? 'You' : (row.profile || 'Explorer')}
+                            </div>
+                            <div className={classNames('text-xs mt-0.5 flex items-center gap-2', isMe ? 'text-slate-700' : 'text-white/50')}>
+                              <span>{row.quests_completed}/10 quests</span>
+                              {row.socials_completed > 0 && <span>· {row.socials_completed} social</span>}
+                            </div>
+                          </div>
+
+                          {/* XP */}
+                          <div className={classNames('shrink-0 text-right', isMe ? 'text-slate-950' : '')}>
+                            <div className="font-black text-lg">{row.xp}</div>
+                            <div className={classNames('text-[10px] uppercase tracking-widest font-bold', isMe ? 'text-slate-700' : 'text-white/40')}>XP</div>
+                          </div>
                         </div>
                       );
                     })
                   )}
                 </div>
+
+                {leaderboard && leaderboard.length > 0 && (
+                  <p className="text-center text-white/25 text-xs mt-4">Showing top {leaderboard.length} players · Updates live</p>
+                )}
               </motion.div>
             )}
 
