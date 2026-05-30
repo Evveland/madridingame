@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, MapPin, Gift, Star, QrCode, Users, CheckCircle2, Lock, ArrowLeft, Search, BadgeCheck, Sparkles, Ticket, Target, Crown, MessageCircleQuestion, Store, UserRound, Home, LayoutDashboard, Mail, Download, Save, Eye, Pencil, BarChart3, Phone } from 'lucide-react';
 import { usePlayer, XP } from './usePlayer';
