@@ -202,6 +202,18 @@ export default function MadridInGameQuestPrototype() {
   const [contactStartupId, setContactStartupId] = useState(null);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [joinType, setJoinType] = useState(null);
+  const [currentSocialLinks, setCurrentSocialLinks] = useState({});
+
+  // Load social links whenever the selected startup changes
+  useEffect(() => {
+    if (!selected) { setCurrentSocialLinks({}); return; }
+    supabase
+      .from('startup_profiles')
+      .select('social_links')
+      .eq('startup_id', selected)
+      .maybeSingle()
+      .then(({ data }) => setCurrentSocialLinks(data?.social_links || {}));
+  }, [selected]);
 
   // QR deep-link: ?startup=evveland → open that startup's quest page
   useEffect(() => {
@@ -450,15 +462,11 @@ export default function MadridInGameQuestPrototype() {
                     primary
                     onTap={() => setScreen('question')}
                   />
-                  <QuestAction
-                    icon={Users}
-                    title="Social Task"
-                    description={current.socialTask}
-                    xp={XP.SOCIAL}
+                  <SocialQuestAction
+                    socialLinks={currentSocialLinks}
+                    socialTask={current.socialTask}
                     done={!!socialDone[current.id]}
-                    doneLabel="Social task done"
-                    cta="Mark as done"
-                    onTap={markSocialDone}
+                    onMarkDone={markSocialDone}
                   />
                   <QuestAction
                     icon={Mail}
@@ -859,6 +867,88 @@ function StartupCard({ startup, completed, socialDone, onClick }) {
         )}
       </div>
     </button>
+  );
+}
+
+const SOCIAL_CHANNELS = [
+  { key: 'instagram',  label: 'Instagram',  color: 'bg-pink-500/20 text-pink-300 border-pink-400/20'      },
+  { key: 'twitter_x',  label: 'X / Twitter', color: 'bg-white/10 text-white/70 border-white/10'           },
+  { key: 'linkedin',   label: 'LinkedIn',   color: 'bg-blue-500/20 text-blue-300 border-blue-400/20'      },
+  { key: 'tiktok',     label: 'TikTok',     color: 'bg-rose-500/20 text-rose-300 border-rose-400/20'      },
+  { key: 'youtube',    label: 'YouTube',    color: 'bg-red-500/20 text-red-300 border-red-400/20'         },
+  { key: 'website',    label: 'Website',    color: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/20'      },
+];
+
+function SocialQuestAction({ socialLinks, socialTask, done, onMarkDone }) {
+  const activeChannels = SOCIAL_CHANNELS.filter(c => socialLinks?.[c.key]?.trim());
+  const hasLinks = activeChannels.length > 0;
+
+  if (done) {
+    return (
+      <div className="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4 flex items-center gap-4">
+        <div className="w-11 h-11 rounded-xl bg-emerald-400 text-slate-950 flex items-center justify-center shrink-0">
+          <CheckCircle2 size={22} />
+        </div>
+        <div>
+          <div className="font-black text-emerald-300">Social Task</div>
+          <div className="text-xs text-emerald-400/70 mt-0.5">Done · +{XP.SOCIAL} XP earned</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasLinks) {
+    return (
+      <div className="rounded-2xl bg-white/5 border border-white/5 p-4 flex items-center gap-4 opacity-50">
+        <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+          <Users size={22} className="text-white/30" />
+        </div>
+        <div>
+          <div className="font-black text-white/50">Social Task</div>
+          <div className="text-xs text-white/30 mt-0.5">Not available yet — founder hasn't added their channels</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl bg-white/10 border border-white/10 p-4">
+      <div className="flex items-start gap-4">
+        <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+          <Users size={22} className="text-white/70" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-black text-white">Social Task</div>
+            <div className="text-xs font-black text-cyan-300">+{XP.SOCIAL} XP</div>
+          </div>
+          <p className="text-xs text-white/50 mt-0.5 leading-snug">{socialTask}</p>
+        </div>
+      </div>
+
+      {/* Channel link buttons */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {activeChannels.map(({ key, label, color }) => (
+          <a
+            key={key}
+            href={socialLinks[key]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={classNames('rounded-full px-3 py-1.5 text-xs font-bold border flex items-center gap-1.5 active:scale-95 transition', color)}
+          >
+            <span>{label}</span>
+            <ArrowLeft size={11} className="rotate-[135deg]" />
+          </a>
+        ))}
+      </div>
+
+      <button
+        onClick={onMarkDone}
+        className="mt-3 w-full rounded-xl bg-white/10 border border-white/10 py-2.5 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition"
+      >
+        <CheckCircle2 size={16} className="text-white/50" /> Mark as done · +{XP.SOCIAL} XP
+      </button>
+    </div>
   );
 }
 
@@ -1492,6 +1582,34 @@ function StartupDashboard({ startup, startups, dashboardStartupId, setDashboardS
             <EditableTextarea label="Optional social task"  value={form.social_task} onChange={v => setField('social_task', v)} />
           </div>
         )}
+      </div>
+
+      {/* ── Social media ── */}
+      <div className="mt-5 rounded-3xl bg-white/10 border border-white/10 p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-black text-xl">Social Media</h3>
+          {Object.values(form.social_links || {}).some(v => v?.trim()) && (
+            <span className="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">Active ✓</span>
+          )}
+        </div>
+        <p className="text-white/50 text-xs mb-4">Fill in at least one channel to activate the Social Task for visitors.</p>
+        <div className="space-y-3">
+          {SOCIAL_CHANNELS.map(({ key, label, color }) => (
+            <div key={key}>
+              <label className="text-[10px] uppercase tracking-widest text-white/35 font-bold flex items-center gap-2">
+                <span className={classNames('rounded-full px-2 py-0.5 border text-[9px]', color)}>{label}</span>
+              </label>
+              <input
+                value={form.social_links?.[key] || ''}
+                onChange={e => setField('social_links', { ...(form.social_links || {}), [key]: e.target.value })}
+                placeholder={`https://`}
+                type="url"
+                className="mt-1.5 w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 outline-none text-sm font-mono focus:border-cyan-400/50 transition"
+              />
+            </div>
+          ))}
+        </div>
+        <p className="text-white/30 text-xs mt-4">Save using the Startup Profile save button above.</p>
       </div>
 
       {/* ── Contacts & Leads ── */}

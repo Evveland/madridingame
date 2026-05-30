@@ -15,7 +15,8 @@ function formFromStatic(s) {
     mission:     s.mission     || '',
     question:    s.question    || '',
     answer:      s.answer      || '',
-    social_task: s.socialTask  || '',
+    social_task:  s.socialTask   || '',
+    social_links: s.social_links || {},
   };
 }
 
@@ -61,7 +62,8 @@ export function useDashboard(staticStartup) {
             mission:     p.mission     || staticStartup.mission     || '',
             question:    p.question    || staticStartup.question    || '',
             answer:      p.answer      || staticStartup.answer      || '',
-            social_task: p.social_task || staticStartup.socialTask  || '',
+            social_task:  p.social_task  || staticStartup.socialTask  || '',
+            social_links: p.social_links || staticStartup.social_links || {},
           });
         }
         setContacts(contactsRes.data || []);
