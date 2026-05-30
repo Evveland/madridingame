@@ -1097,40 +1097,66 @@ function PinPad({ onSuccess, onBack }) {
   );
 }
 
+function formFromStatic(s) {
+  if (!s) return {};
+  return {
+    name:        s.name        || '',
+    founder:     s.founder     || '',
+    category:    s.category    || '',
+    booth:       s.booth       || '',
+    description: s.description || '',
+    mission:     s.mission     || '',
+    question:    s.question    || '',
+    answer:      s.answer      || '',
+    social_task: s.socialTask  || '',
+  };
+}
+
 function StartupDashboard({ startup: staticStartup, startups, dashboardStartupId, setDashboardStartupId, onSignOut, locked }) {
-  const [form, setForm]         = useState({});
-  const [contacts, setContacts] = useState([]);
+  const [form, setForm]             = useState(() => formFromStatic(staticStartup));
+  const [contacts, setContacts]     = useState([]);
   const [questViews, setQuestViews] = useState(0);
   const [loadingData, setLoadingData] = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [saved, setSaved]       = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [saved, setSaved]           = useState(false);
 
   useEffect(() => {
-    if (staticStartup?.id) loadAll(staticStartup.id);
+    if (!staticStartup?.id) return;
+    setForm(formFromStatic(staticStartup));
+    setLoadingData(true);
+    loadAll(staticStartup.id);
   }, [staticStartup?.id]);
 
   async function loadAll(id) {
-    setLoadingData(true);
-    const [{ data: p }, { data: c }, { count }] = await Promise.all([
-      supabase.from('startup_profiles').select('*').eq('startup_id', id).maybeSingle(),
-      supabase.from('contacts').select('*').eq('startup_id', id).order('created_at', { ascending: false }),
-      supabase.from('quest_completions').select('*', { count: 'exact', head: true }).eq('startup_id', id),
-    ]);
-    const src = p || staticStartup;
-    setForm({
-      name:        src.name        || '',
-      founder:     src.founder     || '',
-      category:    src.category    || '',
-      booth:       src.booth       || '',
-      description: src.description || '',
-      mission:     src.mission     || '',
-      question:    src.question    || '',
-      answer:      src.answer      || staticStartup.answer || '',
-      social_task: src.social_task || src.socialTask || '',
-    });
-    setContacts(c || []);
-    setQuestViews(count || 0);
-    setLoadingData(false);
+    try {
+      const [profileRes, contactsRes, countRes] = await Promise.all([
+        supabase.from('startup_profiles').select('*').eq('startup_id', id).maybeSingle(),
+        supabase.from('contacts').select('*').eq('startup_id', id).order('created_at', { ascending: false }),
+        supabase.from('quest_completions').select('id', { count: 'exact', head: true }).eq('startup_id', id),
+      ]);
+      const p = profileRes.data;
+      const c = contactsRes.data;
+      const count = countRes.count;
+      if (p) {
+        setForm({
+          name:        p.name        || staticStartup.name        || '',
+          founder:     p.founder     || staticStartup.founder     || '',
+          category:    p.category    || staticStartup.category    || '',
+          booth:       p.booth       || staticStartup.booth       || '',
+          description: p.description || staticStartup.description || '',
+          mission:     p.mission     || staticStartup.mission     || '',
+          question:    p.question    || staticStartup.question    || '',
+          answer:      p.answer      || staticStartup.answer      || '',
+          social_task: p.social_task || staticStartup.socialTask  || '',
+        });
+      }
+      setContacts(c || []);
+      setQuestViews(count || 0);
+    } catch (err) {
+      console.error('StartupDashboard loadAll error:', err);
+    } finally {
+      setLoadingData(false);
+    }
   }
 
   function setField(key, val) { setForm(f => ({ ...f, [key]: val })); }
