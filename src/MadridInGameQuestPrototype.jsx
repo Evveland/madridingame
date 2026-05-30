@@ -753,7 +753,7 @@ export default function MadridInGameQuestPrototype() {
           </AnimatePresence>
         </div>
 
-        <BottomNav screen={screen} setScreen={setScreen} dashboardAuth={dashboardAuth} />
+        <BottomNav screen={screen} setScreen={setScreen} dashboardAuth={dashboardAuth} onLeaderboard={fetchLeaderboard} />
       </div>
     </div>
   );
@@ -784,7 +784,7 @@ function TopBar({ xp, completedCount }) {
   );
 }
 
-function BottomNav({ screen, setScreen, dashboardAuth }) {
+function BottomNav({ screen, setScreen, dashboardAuth, onLeaderboard }) {
   const items = [
     ['splash', Home, 'Home'],
     ['map', Target, 'Quests'],
@@ -796,7 +796,7 @@ function BottomNav({ screen, setScreen, dashboardAuth }) {
     if (id === 'dashboard') {
       setScreen(dashboardAuth ? 'dashboard' : 'pin');
     } else {
-      if (id === 'leaderboard') fetchLeaderboard();
+      if (id === 'leaderboard' && onLeaderboard) onLeaderboard();
       setScreen(id);
     }
   }
