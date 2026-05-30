@@ -621,7 +621,8 @@ export default function MadridInGameQuestPrototype() {
                 playerProfile={player?.profile || ''}
                 onSubmit={async (fields) => {
                   await submitContact({ startupId: contactStartupId, ...fields });
-                  setScreen('startup');
+                  // do NOT navigate here — ContactForm shows success screen first,
+                  // then calls onBack when user taps "Back to Startup"
                 }}
                 onBack={() => setScreen('startup')}
               />
