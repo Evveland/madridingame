@@ -427,33 +427,97 @@ export default function MadridInGameQuestPrototype() {
                   <p className="text-white/70 mt-4 leading-relaxed">{current.description}</p>
                   <p className="text-cyan-200 mt-4 font-bold">{current.mission}</p>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <MiniTask icon={QrCode} title="Visit Booth" subtitle={`Scan QR · +${XP.VISIT_BOOTH} XP`} done={hasAction('visit_booth', current.id)} />
-                  <MiniTask icon={MessageCircleQuestion} title="Ask Founder" subtitle={`+${current.xp} XP`} done={!!completed[current.id]} />
-                  <MiniTask icon={Users} title="Social Task" subtitle={`Optional +${XP.SOCIAL} XP`} done={!!socialDone[current.id]} />
-                  <MiniTask icon={Mail} title="Share Details" subtitle={`+${XP.CONTACT_STARTUP} XP`} done={hasAction('contact_startup', current.id)} />
-                  <MiniTask icon={Gift} title="Merch" subtitle="Redeem XP" done={xp >= 300} />
+                {/* Quest action cards — each one is the CTA */}
+                <div className="mt-5 space-y-3">
+                  <QuestAction
+                    icon={QrCode}
+                    title="Visit Booth"
+                    description="Scan the founder's QR code to unlock this quest"
+                    xp={XP.VISIT_BOOTH}
+                    done={hasAction('visit_booth', current.id)}
+                    doneLabel="Booth visited"
+                    cta="How to scan"
+                    onTap={() => setScreen('visitBooth')}
+                  />
+                  <QuestAction
+                    icon={MessageCircleQuestion}
+                    title="Ask the Founder"
+                    description={current.question}
+                    xp={current.xp}
+                    done={!!completed[current.id]}
+                    doneLabel="Question answered"
+                    cta="Answer now"
+                    primary
+                    onTap={() => setScreen('question')}
+                  />
+                  <QuestAction
+                    icon={Users}
+                    title="Social Task"
+                    description={current.socialTask}
+                    xp={XP.SOCIAL}
+                    done={!!socialDone[current.id]}
+                    doneLabel="Social task done"
+                    cta="Mark as done"
+                    onTap={markSocialDone}
+                  />
+                  <QuestAction
+                    icon={Mail}
+                    title="Share Your Details"
+                    description={`Let ${current.name} follow up with you after the event`}
+                    xp={XP.CONTACT_STARTUP}
+                    done={hasAction('contact_startup', current.id)}
+                    doneLabel="Details shared"
+                    cta="Share now"
+                    onTap={() => { setContactStartupId(current.id); setScreen('contactForm'); }}
+                  />
+                  <QuestAction
+                    icon={Gift}
+                    title="Redeem Merch"
+                    description="Spend your XP on Madrid in Game merch at the booth"
+                    xp={null}
+                    done={xp >= 300}
+                    doneLabel={xp >= 300 ? 'XP unlocked — go to Store' : null}
+                    cta={xp >= 300 ? 'Go to Store' : `Need ${300 - xp} more XP`}
+                    onTap={() => setScreen('store')}
+                    disabled={xp < 300}
+                  />
                 </div>
-                <button onClick={() => setScreen('question')} className="mt-5 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4 shadow-lg shadow-cyan-500/30">
-                  Start Founder Question
-                </button>
-                {!socialDone[current.id] && (
-                  <button onClick={markSocialDone} className="mt-3 w-full rounded-2xl bg-white/10 border border-white/10 font-bold py-4">
-                    Complete Social Task +{XP.SOCIAL} XP
-                  </button>
-                )}
-                {hasAction('contact_startup', current.id) ? (
-                  <div className="mt-3 w-full rounded-2xl bg-emerald-400/10 border border-emerald-300/20 text-emerald-300 font-bold py-4 flex items-center justify-center gap-2 text-sm">
-                    <CheckCircle2 size={17} /> Details shared · +{XP.CONTACT_STARTUP} XP earned
+              </motion.div>
+            )}
+
+            {screen === 'visitBooth' && current && (
+              <motion.div key="visitBooth" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="px-5 pt-4 pb-6">
+                <Back onClick={() => setScreen('startup')} />
+                <div className="mt-6 text-center">
+                  <div className="w-20 h-20 rounded-3xl bg-cyan-400/10 border border-cyan-300/20 flex items-center justify-center mx-auto mb-5">
+                    <QrCode size={36} className="text-cyan-300" />
                   </div>
-                ) : (
-                  <button
-                    onClick={() => { setContactStartupId(current.id); setScreen('contactForm'); }}
-                    className="mt-3 w-full rounded-2xl bg-white/5 border border-white/10 text-white/60 font-semibold py-4 flex items-center justify-center gap-2 active:scale-[0.98] transition"
-                  >
-                    <Mail size={17} /> Share your details · +{XP.CONTACT_STARTUP} XP
-                  </button>
+                  <h2 className="text-3xl font-black">Visit the Booth</h2>
+                  <p className="text-white/60 mt-3 leading-relaxed">Ask the founder to show you their QR code, then scan it with your phone camera to unlock this quest and earn <span className="text-cyan-300 font-black">+{XP.VISIT_BOOTH} XP</span>.</p>
+                </div>
+                <div className="mt-8 space-y-3">
+                  {[
+                    ['1', 'Find the booth', current.booth],
+                    ['2', 'Ask the founder', `Show me your QR code`],
+                    ['3', 'Scan with camera', 'Opens this quest automatically'],
+                  ].map(([n, title, sub]) => (
+                    <div key={n} className="flex items-center gap-4 rounded-2xl bg-white/10 border border-white/10 px-4 py-3">
+                      <div className="w-8 h-8 rounded-full bg-cyan-400 text-slate-950 font-black flex items-center justify-center shrink-0 text-sm">{n}</div>
+                      <div>
+                        <div className="font-black text-sm">{title}</div>
+                        <div className="text-xs text-white/50 mt-0.5">{sub}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {hasAction('visit_booth', current.id) && (
+                  <div className="mt-5 rounded-2xl bg-emerald-400/10 border border-emerald-300/20 text-emerald-300 font-bold py-4 flex items-center justify-center gap-2 text-sm">
+                    <CheckCircle2 size={17} /> Booth already visited · +{XP.VISIT_BOOTH} XP earned
+                  </div>
                 )}
+                <button onClick={() => setScreen('startup')} className="mt-4 w-full rounded-2xl bg-white/10 border border-white/10 font-bold py-4">
+                  Back to Quest
+                </button>
               </motion.div>
             )}
 
@@ -798,17 +862,54 @@ function StartupCard({ startup, completed, socialDone, onClick }) {
   );
 }
 
-function MiniTask({ icon: Icon, title, subtitle, done }) {
+function QuestAction({ icon: Icon, title, description, xp, done, doneLabel, cta, primary, disabled, onTap }) {
+  if (done) {
+    return (
+      <div className="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4 flex items-center gap-4">
+        <div className="w-11 h-11 rounded-xl bg-emerald-400 text-slate-950 flex items-center justify-center shrink-0">
+          <CheckCircle2 size={22} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-black text-emerald-300">{title}</div>
+          <div className="text-xs text-emerald-400/70 mt-0.5">{doneLabel || 'Completed'}{xp ? ` · +${xp} XP` : ''}</div>
+        </div>
+        {/* still tappable if marked done but wants to revisit (e.g. Store) */}
+        {onTap && !disabled && (
+          <button onClick={onTap} className="shrink-0 text-emerald-300/60 active:scale-95 transition">
+            <ArrowLeft size={18} className="rotate-180" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className={classNames('rounded-2xl p-3 border flex items-center gap-3', done ? 'bg-emerald-400/10 border-emerald-300/30' : 'bg-white/5 border-white/10')}>
-      <div className={classNames('w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0', done ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-white/50')}>
-        {done ? <CheckCircle2 size={18} /> : <Icon size={18} />}
+    <button
+      onClick={disabled ? undefined : onTap}
+      className={classNames(
+        'w-full rounded-2xl p-4 flex items-center gap-4 text-left transition active:scale-[0.98]',
+        disabled
+          ? 'bg-white/5 border border-white/5 opacity-50 cursor-default'
+          : primary
+            ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/25'
+            : 'bg-white/10 border border-white/10'
+      )}
+    >
+      <div className={classNames(
+        'w-11 h-11 rounded-xl flex items-center justify-center shrink-0',
+        disabled ? 'bg-white/10' : primary ? 'bg-slate-950/20' : 'bg-white/10'
+      )}>
+        <Icon size={22} className={primary ? 'text-slate-950' : 'text-white/70'} />
       </div>
-      <div>
-        <div className={classNames('text-xs font-black', done ? 'text-emerald-300' : 'text-white/80')}>{title}</div>
-        <div className="text-[10px] text-white/40">{subtitle}</div>
+      <div className="flex-1 min-w-0">
+        <div className={classNames('font-black', primary ? 'text-slate-950' : 'text-white')}>{title}</div>
+        <div className={classNames('text-xs mt-0.5 line-clamp-1', primary ? 'text-slate-700' : 'text-white/50')}>{description}</div>
       </div>
-    </div>
+      <div className={classNames('shrink-0 text-right', primary ? 'text-slate-700' : 'text-white/50')}>
+        {xp && <div className="text-xs font-black text-cyan-300">{primary ? '' : `+${xp} XP`}</div>}
+        <div className={classNames('text-xs font-bold mt-0.5', primary ? 'text-slate-950 font-black' : 'text-white/40')}>{cta}</div>
+      </div>
+    </button>
   );
 }
 
