@@ -1406,8 +1406,10 @@ function DashboardScreen({ startup, startups, dashboardStartupId, setDashboardSt
 function StartupDashboard({ startup, startups, dashboardStartupId, setDashboardStartupId, onSignOut, locked, db }) {
   const { form, setField, contacts, questViews, loading, saving, saved, save, updateContactStatus, downloadCSV, boothQrDataUrl, boothUrl } = db;
 
-  const hotLeads  = contacts.filter(c => c.status === 'Hot lead').length;
-  const followUps = contacts.filter(c => c.status === 'Follow up').length;
+  const newLeads   = contacts.filter(c => c.status === 'New').length;
+  const followUps  = contacts.filter(c => c.status === 'Follow up').length;
+  const hotLeads   = contacts.filter(c => c.status === 'Hot lead').length;
+  const closed     = contacts.filter(c => c.status === 'Closed').length;
   const conversion = questViews > 0 ? Math.round((contacts.length / questViews) * 100) : 0;
 
   return (
@@ -1455,7 +1457,7 @@ function StartupDashboard({ startup, startups, dashboardStartupId, setDashboardS
         <DashboardStat icon={Eye}         label="Quests"  value={questViews} />
         <DashboardStat icon={CheckCircle2} label="Leads"   value={contacts.length} />
         <DashboardStat icon={BarChart3}   label="Conv."   value={`${conversion}%`} />
-        <DashboardStat icon={Users}       label="Hot"     value={hotLeads} />
+        <DashboardStat icon={Users}       label="Hot 🔥"  value={hotLeads} />
       </div>
 
       {/* ── Booth QR code ── */}
@@ -1505,15 +1507,18 @@ function StartupDashboard({ startup, startups, dashboardStartupId, setDashboardS
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <div className="rounded-2xl bg-black/20 border border-white/10 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Hot leads</div>
-            <div className="text-2xl font-black text-cyan-300">{hotLeads}</div>
-          </div>
-          <div className="rounded-2xl bg-black/20 border border-white/10 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Follow-ups</div>
-            <div className="text-2xl font-black text-cyan-300">{followUps}</div>
-          </div>
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          {[
+            { label: 'New',       value: newLeads,  color: 'text-white/70'       },
+            { label: 'Follow up', value: followUps, color: 'text-cyan-300'       },
+            { label: 'Hot lead',  value: hotLeads,  color: 'text-emerald-300'    },
+            { label: 'Closed',    value: closed,    color: 'text-white/30'       },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="rounded-2xl bg-black/20 border border-white/10 p-3 text-center">
+              <div className="text-[9px] uppercase tracking-widest text-white/35 font-bold leading-tight">{label}</div>
+              <div className={classNames('text-2xl font-black mt-1', color)}>{value}</div>
+            </div>
+          ))}
         </div>
 
         {loading ? (
