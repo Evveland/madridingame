@@ -294,30 +294,30 @@ export default function MadridInGameQuestPrototype() {
         <div className="relative z-10 flex-1 overflow-y-auto">
           <AnimatePresence mode="wait">
             {screen === 'splash' && (
-              <motion.div key="splash" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-10 pb-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-xs text-cyan-100 mb-6">
+              <motion.div key="splash" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-5 pb-6">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-xs text-cyan-100 mb-4">
                   <Sparkles size={14} /> South Summit Quest
                 </div>
-                <div className="rounded-3xl bg-[#1f2020] border border-white/10 p-6 shadow-2xl flex justify-center">
-                  <img src={MIG_LOGO} alt="Madrid in Game official logo" className="w-64 max-w-full object-contain" />
+                <div className="rounded-2xl bg-[#1f2020] border border-white/10 p-3 shadow-2xl flex justify-center">
+                  <img src={MIG_LOGO} alt="Madrid in Game official logo" className="w-36 max-w-full object-contain" />
                 </div>
-                <h1 className="text-4xl font-black leading-none tracking-tight mt-6">
+                <h1 className="text-3xl font-black leading-none tracking-tight mt-4">
                   South Summit <span className="text-cyan-300">Quest</span>
                 </h1>
-                <p className="text-white/70 mt-5 text-lg leading-relaxed">
-                  Meet the startups shaping the future of gaming, AI, VR and audience economies. Complete booth quests, earn XP and redeem merch.
+                <p className="text-white/60 mt-3 text-sm leading-relaxed">
+                  Visit startup booths, ask founders a secret question, earn XP and redeem merch.
                 </p>
-                <div className="mt-8 rounded-3xl p-5 bg-white/10 border border-white/10 backdrop-blur shadow-xl">
+                <div className="mt-4 rounded-2xl p-4 bg-white/10 border border-white/10 backdrop-blur shadow-xl">
                   <div className="grid grid-cols-3 gap-3 text-center">
                     <Stat value="10" label="Startups" />
                     <Stat value="2K" label="Max XP" />
                     <Stat value="5" label="Rewards" />
                   </div>
                 </div>
-                <button onClick={() => setScreen('onboarding')} className="mt-8 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4 shadow-lg shadow-cyan-500/30 active:scale-[0.98] transition">
+                <button onClick={() => setScreen('onboarding')} className="mt-4 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4 shadow-lg shadow-cyan-500/30 active:scale-[0.98] transition">
                   Start Quest
                 </button>
-                <button onClick={() => setScreen('map')} className="mt-3 w-full rounded-2xl bg-white/10 border border-white/10 text-white font-semibold py-4">
+                <button onClick={() => setScreen('map')} className="mt-3 w-full rounded-2xl bg-white/10 border border-white/10 text-white font-semibold py-3">
                   Preview Startup Map
                 </button>
               </motion.div>
