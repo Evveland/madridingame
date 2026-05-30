@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, MapPin, Gift, Star, QrCode, Users, CheckCircle2, Lock, ArrowLeft, Search, BadgeCheck, Sparkles, Ticket, Target, Crown, MessageCircleQuestion, Store, UserRound, Home, LayoutDashboard, Mail, Download, Save, Eye, Pencil, BarChart3, Phone } from 'lucide-react';
-import { usePlayer } from './usePlayer';
+import { usePlayer, XP } from './usePlayer';
 import { useDashboard } from './useDashboard';
 import { useMigLeads } from './useMigLeads';
 import { supabase } from './supabase';
@@ -198,13 +198,17 @@ export default function MadridInGameQuestPrototype() {
   const [dashboardAuth, setDashboardAuth] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
 
-  const { player, completed, socialDone, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact } = usePlayer();
+  const { player, completed, socialDone, actions, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact, submitJoinMig, hasAction, actionXp } = usePlayer();
   const [contactStartupId, setContactStartupId] = useState(null);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [joinType, setJoinType] = useState(null);
 
   const completedCount = Object.keys(completed).length;
-  const xp = 50 + completedCount * 100 + Object.keys(socialDone).length * 50 + (completedCount === startups.length ? 500 : 0);
+  const xp = XP.BASE
+    + completedCount * XP.QUEST
+    + Object.keys(socialDone).length * XP.SOCIAL
+    + (completedCount === startups.length ? XP.ALL_QUESTS : 0)
+    + actionXp();
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -300,9 +304,15 @@ export default function MadridInGameQuestPrototype() {
                   <button onClick={() => setScreen('onboarding')} className="mt-4 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4 shadow-lg shadow-cyan-500/30 active:scale-[0.98] transition">
                     Start Quest
                   </button>
-                  <button onClick={() => { setJoinType(null); setScreen('joinType'); }} className="mt-3 w-full rounded-2xl bg-white/10 border border-cyan-400/30 text-cyan-300 font-black py-4 active:scale-[0.98] transition">
-                    Join Madrid in Game →
-                  </button>
+                  {hasAction('join_mig') ? (
+                    <div className="mt-3 w-full rounded-2xl bg-emerald-400/10 border border-emerald-300/20 text-emerald-300 font-bold py-4 flex items-center justify-center gap-2 text-sm">
+                      <CheckCircle2 size={17} /> Joined Madrid in Game · +{XP.JOIN_MIG} XP
+                    </div>
+                  ) : (
+                    <button onClick={() => { setJoinType(null); setScreen('joinType'); }} className="mt-3 w-full rounded-2xl bg-white/10 border border-cyan-400/30 text-cyan-300 font-black py-4 active:scale-[0.98] transition">
+                      Join Madrid in Game · +{XP.JOIN_MIG} XP →
+                    </button>
+                  )}
                   <button onClick={() => setScreen('map')} className="mt-3 w-full rounded-2xl bg-white/5 border border-white/10 text-white/50 font-semibold py-3">
                     Preview Startup Map
                   </button>
@@ -399,7 +409,8 @@ export default function MadridInGameQuestPrototype() {
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <MiniTask icon={QrCode} title="Visit Booth" subtitle="Scan booth QR" done />
                   <MiniTask icon={MessageCircleQuestion} title="Ask Founder" subtitle={`+${current.xp} XP`} done={!!completed[current.id]} />
-                  <MiniTask icon={Users} title="Social Task" subtitle="Optional +50 XP" done={!!socialDone[current.id]} />
+                  <MiniTask icon={Users} title="Social Task" subtitle={`Optional +${XP.SOCIAL} XP`} done={!!socialDone[current.id]} />
+                  <MiniTask icon={Mail} title="Share Details" subtitle={`+${XP.CONTACT_STARTUP} XP`} done={hasAction('contact_startup', current.id)} />
                   <MiniTask icon={Gift} title="Merch" subtitle="Redeem XP" done={xp >= 300} />
                 </div>
                 <button onClick={() => setScreen('question')} className="mt-5 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4 shadow-lg shadow-cyan-500/30">
@@ -407,15 +418,21 @@ export default function MadridInGameQuestPrototype() {
                 </button>
                 {!socialDone[current.id] && (
                   <button onClick={markSocialDone} className="mt-3 w-full rounded-2xl bg-white/10 border border-white/10 font-bold py-4">
-                    Complete Optional Social Task +50 XP
+                    Complete Social Task +{XP.SOCIAL} XP
                   </button>
                 )}
-                <button
-                  onClick={() => { setContactStartupId(current.id); setScreen('contactForm'); }}
-                  className="mt-3 w-full rounded-2xl bg-white/5 border border-white/10 text-white/60 font-semibold py-4 flex items-center justify-center gap-2 active:scale-[0.98] transition"
-                >
-                  <Mail size={17} /> Share your details with {current.name}
-                </button>
+                {hasAction('contact_startup', current.id) ? (
+                  <div className="mt-3 w-full rounded-2xl bg-emerald-400/10 border border-emerald-300/20 text-emerald-300 font-bold py-4 flex items-center justify-center gap-2 text-sm">
+                    <CheckCircle2 size={17} /> Details shared · +{XP.CONTACT_STARTUP} XP earned
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setContactStartupId(current.id); setScreen('contactForm'); }}
+                    className="mt-3 w-full rounded-2xl bg-white/5 border border-white/10 text-white/60 font-semibold py-4 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                  >
+                    <Mail size={17} /> Share your details · +{XP.CONTACT_STARTUP} XP
+                  </button>
+                )}
               </motion.div>
             )}
 
@@ -567,7 +584,7 @@ export default function MadridInGameQuestPrototype() {
               <JoinForm
                 type={joinType}
                 onSubmit={async (fields) => {
-                  await supabase.from('mig_leads').insert({ type: joinType, ...fields });
+                  await submitJoinMig({ type: joinType, ...fields });
                   setScreen('joinSuccess');
                 }}
                 onBack={() => setScreen('joinType')}
@@ -582,11 +599,17 @@ export default function MadridInGameQuestPrototype() {
                 </motion.div>
                 <h2 className="text-3xl font-black mt-6">You're in!</h2>
                 <p className="text-white/60 mt-3 leading-relaxed">The Madrid in Game team will reach out soon. Welcome to the ecosystem.</p>
-                <div className="mt-6 rounded-2xl bg-white/10 border border-white/10 p-4 text-left">
-                  <div className="text-[10px] uppercase tracking-widest text-cyan-300 font-bold mb-1">Your interest</div>
-                  <div className="font-black text-lg">{joinType}</div>
+                <div className="mt-5 rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4 flex items-center justify-between">
+                  <div className="text-left">
+                    <div className="text-[10px] uppercase tracking-widest text-cyan-300 font-bold">XP earned</div>
+                    <div className="text-2xl font-black text-cyan-300 mt-0.5">+{XP.JOIN_MIG} XP</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Interest</div>
+                    <div className="font-black mt-0.5">{joinType}</div>
+                  </div>
                 </div>
-                <button onClick={() => setScreen('splash')} className="mt-6 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4">
+                <button onClick={() => setScreen('splash')} className="mt-5 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4">
                   Back to Home
                 </button>
               </motion.div>
@@ -912,7 +935,11 @@ function ContactForm({ startup, playerProfile, onSubmit, onBack }) {
         </motion.div>
         <h2 className="text-3xl font-black mt-6">Details Shared!</h2>
         <p className="text-white/60 mt-3">{startup?.name} will be in touch after the event.</p>
-        <button onClick={onBack} className="mt-8 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4">
+        <div className="mt-5 rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4 inline-flex items-center gap-3 mx-auto">
+          <Trophy size={20} className="text-cyan-300" />
+          <span className="font-black text-cyan-300 text-xl">+{XP.CONTACT_STARTUP} XP</span>
+        </div>
+        <button onClick={onBack} className="mt-5 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4">
           Back to Startup
         </button>
       </motion.div>

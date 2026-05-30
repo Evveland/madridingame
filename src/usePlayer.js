@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
 
+// XP values — single source of truth for client and DB view
+export const XP = {
+  BASE:           50,
+  QUEST:         100,
+  SOCIAL:         50,
+  ALL_QUESTS:    500,
+  CONTACT_STARTUP: 75,
+  JOIN_MIG:      200,
+  REDEEM_CODE:    25,
+};
+
 function getDeviceId() {
   let id = localStorage.getItem('mig_device_id');
   if (!id) {
@@ -21,6 +32,7 @@ export function usePlayer() {
   const [player, setPlayer]               = useState(null);
   const [completed, setCompleted]         = useState({});
   const [socialDone, setSocialDone]       = useState({});
+  const [actions, setActions]             = useState([]);   // player_actions rows
   const [redemptionCode, setRedemptionCode] = useState(null);
   const [loading, setLoading]             = useState(true);
   const playerRef = useRef(null);
@@ -40,10 +52,11 @@ export function usePlayer() {
     setPlayer(p);
     playerRef.current = p;
 
-    const [{ data: qc }, { data: sc }, { data: rc }] = await Promise.all([
+    const [{ data: qc }, { data: sc }, { data: rc }, { data: pa }] = await Promise.all([
       supabase.from('quest_completions').select('startup_id').eq('player_id', p.id),
       supabase.from('social_completions').select('startup_id').eq('player_id', p.id),
       supabase.from('redemption_codes').select('code,xp,used').eq('player_id', p.id).limit(1).maybeSingle(),
+      supabase.from('player_actions').select('action_type,reference_id,xp_earned').eq('player_id', p.id),
     ]);
 
     const cMap = {};
@@ -55,8 +68,24 @@ export function usePlayer() {
     setSocialDone(sMap);
 
     if (rc) setRedemptionCode(rc);
+    setActions(pa || []);
 
     setLoading(false);
+  }
+
+  // Record a one-time action (idempotent — unique constraint in DB)
+  async function recordAction(actionType, referenceId = 'global', xpEarned = 0) {
+    const p = playerRef.current;
+    if (!p) return;
+    const { data, error } = await supabase
+      .from('player_actions')
+      .upsert(
+        { player_id: p.id, action_type: actionType, reference_id: referenceId, xp_earned: xpEarned },
+        { onConflict: 'player_id,action_type,reference_id', ignoreDuplicates: true },
+      )
+      .select('action_type,reference_id,xp_earned')
+      .maybeSingle();
+    if (data) setActions(prev => [...prev.filter(a => !(a.action_type === actionType && a.reference_id === referenceId)), data]);
   }
 
   async function completeQuest(startupId) {
@@ -91,7 +120,6 @@ export function usePlayer() {
     if (!p) return null;
     if (redemptionCode) return redemptionCode;
 
-    // Retry once on rare collision
     for (let i = 0; i < 2; i++) {
       const code = makeCode();
       const { data, error } = await supabase
@@ -101,6 +129,7 @@ export function usePlayer() {
         .single();
       if (!error && data) {
         setRedemptionCode(data);
+        await recordAction('redeem_code', 'global', XP.REDEEM_CODE);
         return data;
       }
     }
@@ -109,20 +138,29 @@ export function usePlayer() {
 
   async function submitContact({ startupId, name, company, email, type, interest }) {
     await supabase.from('contacts').insert({
-      startup_id: startupId,
-      name,
-      company,
-      email,
-      type,
-      interest,
-      status: 'New',
+      startup_id: startupId, name, company, email, type, interest, status: 'New',
     });
+    await recordAction('contact_startup', startupId, XP.CONTACT_STARTUP);
+  }
+
+  async function submitJoinMig(fields) {
+    await supabase.from('mig_leads').insert(fields);
+    await recordAction('join_mig', 'global', XP.JOIN_MIG);
+  }
+
+  // Derived action lookup helpers
+  function hasAction(type, ref = 'global') {
+    return actions.some(a => a.action_type === type && a.reference_id === ref);
+  }
+  function actionXp() {
+    return actions.reduce((sum, a) => sum + (a.xp_earned || 0), 0);
   }
 
   return {
     player,
     completed,
     socialDone,
+    actions,
     redemptionCode,
     loading,
     completeQuest,
@@ -130,5 +168,9 @@ export function usePlayer() {
     saveProfile,
     generateRedemptionCode,
     submitContact,
+    submitJoinMig,
+    recordAction,
+    hasAction,
+    actionXp,
   };
 }
