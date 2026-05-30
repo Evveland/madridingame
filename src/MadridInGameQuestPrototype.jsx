@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, MapPin, Gift, Star, QrCode, Users, CheckCircle2, Lock, ArrowLeft, Search, BadgeCheck, Sparkles, Ticket, Target, Crown, MessageCircleQuestion, Store, UserRound, Home, LayoutDashboard, Mail, Download, Save, Eye, Pencil, BarChart3, Phone } from 'lucide-react';
 import { usePlayer, XP } from './usePlayer';
-import QRCode from 'react-qr-code';
 import { useDashboard } from './useDashboard';
 import { useMigLeads } from './useMigLeads';
 import { supabase } from './supabase';
@@ -1229,19 +1228,12 @@ function MigAdminScreen({ onSignOut }) {
   );
 }
 
-const APP_URL = 'https://project-2gjoz.vercel.app';
-
-function BoothQR({ startup }) {
-  const url = `${APP_URL}/?startup=${startup.id}`;
-
-  function downloadSVG() {
-    const svg = document.getElementById(`qr-${startup.id}`);
-    if (!svg) return;
-    const data = new XMLSerializer().serializeToString(svg);
-    const blob = new Blob([data], { type: 'image/svg+xml' });
+function BoothQR({ startup, qrDataUrl, boothUrl }) {
+  function downloadPNG() {
+    if (!qrDataUrl) return;
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${startup.id}-booth-qr.svg`;
+    a.href = qrDataUrl;
+    a.download = `${startup.id}-booth-qr.png`;
     a.click();
   }
 
@@ -1252,9 +1244,9 @@ function BoothQR({ startup }) {
           <h3 className="font-black text-xl">Booth QR Code</h3>
           <p className="text-white/50 text-xs mt-0.5">Show this to visitors — scanning opens your quest.</p>
         </div>
-        <button onClick={downloadSVG}
-          className="flex items-center gap-1.5 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-xs font-black active:scale-95 transition">
-          <Download size={14} /> SVG
+        <button onClick={downloadPNG} disabled={!qrDataUrl}
+          className="flex items-center gap-1.5 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-xs font-black active:scale-95 transition disabled:opacity-40">
+          <Download size={14} /> PNG
         </button>
       </div>
 
@@ -1262,20 +1254,19 @@ function BoothQR({ startup }) {
         <div className={classNames('rounded-2xl p-5 bg-gradient-to-br relative overflow-hidden', startup.color)}>
           <div className="absolute inset-0 bg-white/10" />
           <div className="relative bg-white rounded-xl p-3 shadow-lg">
-            <QRCode
-              id={`qr-${startup.id}`}
-              value={url}
-              size={180}
-              bgColor="#ffffff"
-              fgColor="#0f172a"
-              level="M"
-            />
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt={`${startup.name} booth QR`} className="w-[180px] h-[180px]" />
+            ) : (
+              <div className="w-[180px] h-[180px] flex items-center justify-center bg-white/5">
+                <QrCode size={40} className="text-slate-400 animate-pulse" />
+              </div>
+            )}
           </div>
         </div>
 
         <div className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
           <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold mb-1">Booth URL</div>
-          <div className="text-xs font-mono text-cyan-300 break-all">{url}</div>
+          <div className="text-xs font-mono text-cyan-300 break-all">{boothUrl}</div>
         </div>
 
         <div className="w-full grid grid-cols-2 gap-2 text-center">
@@ -1312,7 +1303,7 @@ function DashboardScreen({ startup, startups, dashboardStartupId, setDashboardSt
 }
 
 function StartupDashboard({ startup, startups, dashboardStartupId, setDashboardStartupId, onSignOut, locked, db }) {
-  const { form, setField, contacts, questViews, loading, saving, saved, save, updateContactStatus, downloadCSV } = db;
+  const { form, setField, contacts, questViews, loading, saving, saved, save, updateContactStatus, downloadCSV, boothQrDataUrl, boothUrl } = db;
 
   const hotLeads  = contacts.filter(c => c.status === 'Hot lead').length;
   const followUps = contacts.filter(c => c.status === 'Follow up').length;
@@ -1367,7 +1358,7 @@ function StartupDashboard({ startup, startups, dashboardStartupId, setDashboardS
       </div>
 
       {/* ── Booth QR code ── */}
-      <BoothQR startup={startup} />
+      <BoothQR startup={startup} qrDataUrl={boothQrDataUrl} boothUrl={boothUrl} />
 
       {/* ── Editable profile ── */}
       <div className="mt-5 rounded-3xl bg-white/10 border border-white/10 p-5">

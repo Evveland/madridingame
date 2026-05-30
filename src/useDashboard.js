@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { supabase } from './supabase';
+
+const APP_URL = 'https://project-2gjoz.vercel.app';
 
 function formFromStatic(s) {
   if (!s) return {};
@@ -25,11 +28,19 @@ export function useDashboard(staticStartup) {
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
   const [saved, setSaved]           = useState(false);
+  const [boothQrDataUrl, setBoothQrDataUrl] = useState('');
 
   useEffect(() => {
     if (!id) return;
     setForm(formFromStatic(staticStartup));
     setLoading(true);
+    // Generate QR code data URL for the booth
+    QRCode.toDataURL(`${APP_URL}/?startup=${id}`, {
+      width: 220,
+      margin: 2,
+      color: { dark: '#0f172a', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
+    }).then(url => setBoothQrDataUrl(url)).catch(() => {});
     load();
 
     async function load() {
@@ -100,5 +111,6 @@ export function useDashboard(staticStartup) {
     a.click();
   }
 
-  return { form, setField, contacts, questViews, loading, saving, saved, save, updateContactStatus, downloadCSV };
+  const boothUrl = `${APP_URL}/?startup=${id}`;
+  return { form, setField, contacts, questViews, loading, saving, saved, save, updateContactStatus, downloadCSV, boothQrDataUrl, boothUrl };
 }
