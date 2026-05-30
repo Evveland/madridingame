@@ -645,7 +645,6 @@ export default function MadridInGameQuestPrototype() {
                 onSuccess={(startupId) => {
                   setDashboardAuth(startupId);
                   setDashboardStartupId(startupId);
-                  setSavedDashboard(false);
                   setScreen('dashboard');
                 }}
                 onBack={() => setScreen('splash')}
