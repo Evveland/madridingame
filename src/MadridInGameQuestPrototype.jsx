@@ -200,7 +200,7 @@ export default function MadridInGameQuestPrototype() {
   const [myRank, setMyRank]           = useState(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
-  const { player, completed, socialDone, actions, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact, submitJoinMig, hasAction, actionXp, recordAction } = usePlayer();
+  const { player, telegramUser, completed, socialDone, actions, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact, submitJoinMig, hasAction, actionXp, recordAction } = usePlayer();
   const [contactStartupId, setContactStartupId] = useState(null);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [joinType, setJoinType] = useState(null);
@@ -331,7 +331,7 @@ export default function MadridInGameQuestPrototype() {
           <div className="absolute bottom-0 left-8 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl" />
         </div>
 
-        <TopBar xp={xp} completedCount={completedCount} />
+        <TopBar xp={xp} completedCount={completedCount} telegramUser={telegramUser} />
 
         <div className="relative z-10 flex-1 overflow-y-auto">
           <AnimatePresence mode="wait">
@@ -867,7 +867,7 @@ export default function MadridInGameQuestPrototype() {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function TopBar({ xp, completedCount }) {
+function TopBar({ xp, completedCount, telegramUser }) {
   return (
     <div className="relative z-20 shrink-0 px-5 pt-4 pb-2 flex items-center justify-between">
       <div className="flex items-center gap-3">
@@ -876,7 +876,13 @@ function TopBar({ xp, completedCount }) {
         </div>
         <div>
           <div className="text-xs uppercase tracking-widest text-white/40 font-bold">Madrid in Game</div>
-          <div className="font-black text-lg">Quest Passport</div>
+          {telegramUser?.name ? (
+            <div className="font-black text-lg leading-tight">
+              Welcome, <span className="text-cyan-300">{telegramUser.name.split(' ')[0]}</span>!
+            </div>
+          ) : (
+            <div className="font-black text-lg">Quest Passport</div>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2 rounded-2xl bg-white/10 border border-white/10 px-3 py-2">

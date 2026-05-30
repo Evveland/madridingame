@@ -22,6 +22,20 @@ function getDeviceId() {
   return id;
 }
 
+function getTelegramUser() {
+  try {
+    const tg = window.Telegram?.WebApp;
+    if (tg?.initDataUnsafe?.user) {
+      const u = tg.initDataUnsafe.user;
+      return {
+        id:   u.id,
+        name: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || null,
+      };
+    }
+  } catch (_) {}
+  return null;
+}
+
 function makeCode() {
   return 'MIG-' + Array.from(crypto.getRandomValues(new Uint8Array(5)))
     .map(b => b.toString(36).toUpperCase().padStart(2, '0'))
@@ -31,9 +45,10 @@ function makeCode() {
 
 export function usePlayer() {
   const [player, setPlayer]               = useState(null);
+  const [telegramUser, setTelegramUser]   = useState(null);
   const [completed, setCompleted]         = useState({});
   const [socialDone, setSocialDone]       = useState({});
-  const [actions, setActions]             = useState([]);   // player_actions rows
+  const [actions, setActions]             = useState([]);
   const [redemptionCode, setRedemptionCode] = useState(null);
   const [loading, setLoading]             = useState(true);
   const playerRef = useRef(null);
@@ -42,10 +57,19 @@ export function usePlayer() {
 
   async function init() {
     const deviceId = getDeviceId();
+    const tg = getTelegramUser();
+    if (tg) setTelegramUser(tg);
+
+    // Build upsert payload — include Telegram fields if available
+    const upsertPayload = { device_id: deviceId };
+    if (tg) {
+      upsertPayload.telegram_id   = tg.id;
+      upsertPayload.telegram_name = tg.name;
+    }
 
     const { data: p, error } = await supabase
       .from('players')
-      .upsert({ device_id: deviceId }, { onConflict: 'device_id' })
+      .upsert(upsertPayload, { onConflict: 'device_id' })
       .select()
       .single();
 
@@ -159,6 +183,7 @@ export function usePlayer() {
 
   return {
     player,
+    telegramUser,
     completed,
     socialDone,
     actions,
