@@ -235,7 +235,9 @@ export default function MadridInGameQuestPrototype() {
   const [dashboardAuth, setDashboardAuth] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
 
-  const { player, completed, socialDone, loading, completeQuest, completeSocial, saveProfile } = usePlayer();
+  const { player, completed, socialDone, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact } = usePlayer();
+  const [contactStartupId, setContactStartupId] = useState(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
 
   const completedCount = Object.keys(completed).length;
   const xp = 50 + completedCount * 100 + Object.keys(socialDone).length * 50 + (completedCount === startups.length ? 500 : 0);
@@ -421,6 +423,12 @@ export default function MadridInGameQuestPrototype() {
                     Complete Optional Social Task +50 XP
                   </button>
                 )}
+                <button
+                  onClick={() => { setContactStartupId(current.id); setScreen('contactForm'); }}
+                  className="mt-3 w-full rounded-2xl bg-white/5 border border-white/10 text-white/60 font-semibold py-4 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                >
+                  <Mail size={17} /> Share your details with {current.name}
+                </button>
               </motion.div>
             )}
 
@@ -505,14 +513,29 @@ export default function MadridInGameQuestPrototype() {
                     );
                   })}
                 </div>
-                <button onClick={() => setRedeemed(true)} disabled={xp < 300 || redeemed} className={classNames('mt-5 w-full rounded-2xl font-black py-4', xp >= 300 && !redeemed ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-white/40')}>
-                  {redeemed ? 'Redemption Code Used' : 'Generate Redemption Code'}
-                </button>
-                {redeemed && (
-                  <div className="mt-4 rounded-3xl bg-white text-slate-950 p-6 text-center">
+                {!redemptionCode ? (
+                  <button
+                    disabled={xp < 300 || generatingCode}
+                    onClick={async () => {
+                      setGeneratingCode(true);
+                      await generateRedemptionCode(xp);
+                      setGeneratingCode(false);
+                    }}
+                    className={classNames('mt-5 w-full rounded-2xl font-black py-4 transition', xp >= 300 ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/30 active:scale-[0.98]' : 'bg-white/10 text-white/40')}
+                  >
+                    {generatingCode ? 'Generating…' : xp >= 300 ? 'Generate Redemption Code' : `${300 - xp} XP to unlock`}
+                  </button>
+                ) : (
+                  <div className="mt-5 rounded-3xl bg-white text-slate-950 p-6 text-center">
                     <QrCode className="mx-auto" size={86} />
-                    <div className="mt-3 text-xs font-bold text-slate-500">SHOW THIS AT THE BOOTH</div>
-                    <div className="text-2xl font-black">MIG-{String(xp).padStart(4, '0')}</div>
+                    <div className="mt-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Show this at the booth</div>
+                    <div className="text-3xl font-black mt-1 tracking-widest">{redemptionCode.code}</div>
+                    <div className="mt-3 text-sm font-bold text-slate-500">{redemptionCode.xp} XP · {redemptionCode.used ? '✓ Redeemed' : 'Not yet redeemed'}</div>
+                    {redemptionCode.used && (
+                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">
+                        <CheckCircle2 size={13} /> Code used — merch collected!
+                      </div>
+                    )}
                   </div>
                 )}
               </motion.div>
@@ -544,6 +567,18 @@ export default function MadridInGameQuestPrototype() {
                   )}
                 </div>
               </motion.div>
+            )}
+
+            {screen === 'contactForm' && contactStartupId && (
+              <ContactForm
+                startup={startups.find(s => s.id === contactStartupId)}
+                playerProfile={player?.profile || ''}
+                onSubmit={async (fields) => {
+                  await submitContact({ startupId: contactStartupId, ...fields });
+                  setScreen('startup');
+                }}
+                onBack={() => setScreen('startup')}
+              />
             )}
 
             {screen === 'pin' && (
@@ -711,6 +746,97 @@ function MiniTask({ icon: Icon, title, subtitle, done }) {
         <div className="text-[10px] text-white/40">{subtitle}</div>
       </div>
     </div>
+  );
+}
+
+function ContactForm({ startup, playerProfile, onSubmit, onBack }) {
+  const [name, setName]         = useState('');
+  const [company, setCompany]   = useState('');
+  const [email, setEmail]       = useState('');
+  const [type, setType]         = useState(playerProfile || '');
+  const [interest, setInterest] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone]         = useState(false);
+
+  async function handleSubmit() {
+    if (!name.trim() || !email.trim()) return;
+    setSubmitting(true);
+    await onSubmit({ name: name.trim(), company: company.trim(), email: email.trim(), type, interest: interest.trim() });
+    setSubmitting(false);
+    setDone(true);
+  }
+
+  if (done) {
+    return (
+      <motion.div key="contactDone" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="px-5 pt-16 pb-6 text-center">
+        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 180, damping: 12 }}
+          className="mx-auto w-20 h-20 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+          <CheckCircle2 size={44} />
+        </motion.div>
+        <h2 className="text-3xl font-black mt-6">Details Shared!</h2>
+        <p className="text-white/60 mt-3">{startup?.name} will be in touch after the event.</p>
+        <button onClick={onBack} className="mt-8 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4">
+          Back to Startup
+        </button>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div key="contactForm" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
+      <Back onClick={onBack} />
+      <div className="mt-6">
+        <div className={classNames('h-16 rounded-2xl bg-gradient-to-br flex items-center px-5 mb-5', startup?.color || 'from-cyan-500 to-blue-600')}>
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-white/70 font-bold">Sharing with</div>
+            <div className="font-black text-xl">{startup?.name}</div>
+          </div>
+        </div>
+        <h2 className="text-2xl font-black">Leave your details</h2>
+        <p className="text-white/50 mt-1 text-sm">The founder will follow up after South Summit.</p>
+      </div>
+
+      <div className="mt-6 space-y-3">
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Name *</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Your full name"
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold" />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Company / Organisation</label>
+          <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Where are you from?"
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold" />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Email *</label>
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" type="email"
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold" />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">I am a…</label>
+          <select value={type} onChange={e => setType(e.target.value)}
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold bg-[#111735]">
+            <option value="">Select your profile</option>
+            {['Investor', 'Startup founder', 'Corporate / brand', 'Publisher / gaming industry', 'Student / talent', 'Visitor / curious'].map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">What interests you about {startup?.name}?</label>
+          <input value={interest} onChange={e => setInterest(e.target.value)} placeholder="e.g. Partnership, investment, demo…"
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold" />
+        </div>
+      </div>
+
+      <button
+        onClick={handleSubmit}
+        disabled={!name.trim() || !email.trim() || submitting}
+        className={classNames('mt-6 w-full rounded-2xl font-black py-4 transition', name.trim() && email.trim() ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/30 active:scale-[0.98]' : 'bg-white/10 text-white/40')}
+      >
+        {submitting ? 'Submitting…' : 'Share My Details'}
+      </button>
+    </motion.div>
   );
 }
 
