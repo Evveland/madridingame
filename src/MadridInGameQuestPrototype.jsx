@@ -238,6 +238,7 @@ export default function MadridInGameQuestPrototype() {
   const { player, completed, socialDone, redemptionCode, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact } = usePlayer();
   const [contactStartupId, setContactStartupId] = useState(null);
   const [generatingCode, setGeneratingCode] = useState(false);
+  const [joinType, setJoinType] = useState(null);
 
   const completedCount = Object.keys(completed).length;
   const xp = 50 + completedCount * 100 + Object.keys(socialDone).length * 50 + (completedCount === startups.length ? 500 : 0);
@@ -336,7 +337,10 @@ export default function MadridInGameQuestPrototype() {
                   <button onClick={() => setScreen('onboarding')} className="mt-4 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4 shadow-lg shadow-cyan-500/30 active:scale-[0.98] transition">
                     Start Quest
                   </button>
-                  <button onClick={() => setScreen('map')} className="mt-3 w-full rounded-2xl bg-white/10 border border-white/10 text-white font-semibold py-3">
+                  <button onClick={() => { setJoinType(null); setScreen('joinType'); }} className="mt-3 w-full rounded-2xl bg-white/10 border border-cyan-400/30 text-cyan-300 font-black py-4 active:scale-[0.98] transition">
+                    Join Madrid in Game →
+                  </button>
+                  <button onClick={() => setScreen('map')} className="mt-3 w-full rounded-2xl bg-white/5 border border-white/10 text-white/50 font-semibold py-3">
                     Preview Startup Map
                   </button>
                 </div>
@@ -589,6 +593,42 @@ export default function MadridInGameQuestPrototype() {
               </motion.div>
             )}
 
+            {screen === 'joinType' && (
+              <JoinTypePicker
+                onSelect={(t) => { setJoinType(t); setScreen('joinForm'); }}
+                onBack={() => setScreen('splash')}
+              />
+            )}
+
+            {screen === 'joinForm' && joinType && (
+              <JoinForm
+                type={joinType}
+                onSubmit={async (fields) => {
+                  await supabase.from('mig_leads').insert({ type: joinType, ...fields });
+                  setScreen('joinSuccess');
+                }}
+                onBack={() => setScreen('joinType')}
+              />
+            )}
+
+            {screen === 'joinSuccess' && (
+              <motion.div key="joinSuccess" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="px-5 pt-16 pb-6 text-center">
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 180, damping: 12 }}
+                  className="mx-auto w-20 h-20 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                  <CheckCircle2 size={44} />
+                </motion.div>
+                <h2 className="text-3xl font-black mt-6">You're in!</h2>
+                <p className="text-white/60 mt-3 leading-relaxed">The Madrid in Game team will reach out soon. Welcome to the ecosystem.</p>
+                <div className="mt-6 rounded-2xl bg-white/10 border border-white/10 p-4 text-left">
+                  <div className="text-[10px] uppercase tracking-widest text-cyan-300 font-bold mb-1">Your interest</div>
+                  <div className="font-black text-lg">{joinType}</div>
+                </div>
+                <button onClick={() => setScreen('splash')} className="mt-6 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4">
+                  Back to Home
+                </button>
+              </motion.div>
+            )}
+
             {screen === 'contactForm' && contactStartupId && (
               <ContactForm
                 startup={startups.find(s => s.id === contactStartupId)}
@@ -766,6 +806,125 @@ function MiniTask({ icon: Icon, title, subtitle, done }) {
         <div className="text-[10px] text-white/40">{subtitle}</div>
       </div>
     </div>
+  );
+}
+
+const JOIN_OPTIONS = [
+  { id: 'Startup',            icon: Target,        desc: 'Apply to join the Madrid in Game startup programme' },
+  { id: 'Mentor',             icon: UserRound,      desc: 'Share your expertise with the gaming ecosystem' },
+  { id: 'Partnership',        icon: Users,          desc: 'Explore co-marketing or commercial partnerships' },
+  { id: 'Cluster membership', icon: LayoutDashboard,desc: 'Become a member of the Madrid in Game cluster' },
+  { id: 'Other',              icon: Sparkles,       desc: "Tell us how you'd like to get involved" },
+];
+
+function JoinTypePicker({ onSelect, onBack }) {
+  return (
+    <motion.div key="joinType" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
+      <Back onClick={onBack} />
+      <div className="mt-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/10 border border-cyan-300/20 text-xs text-cyan-200 font-bold mb-4">
+          <Sparkles size={13} /> Join Madrid in Game
+        </div>
+        <h2 className="text-3xl font-black leading-tight">How would you like<br />to get involved?</h2>
+        <p className="text-white/50 mt-2 text-sm">Choose the option that best describes you.</p>
+      </div>
+      <div className="mt-6 space-y-3">
+        {JOIN_OPTIONS.map(({ id, icon: Icon, desc }) => (
+          <button
+            key={id}
+            onClick={() => onSelect(id)}
+            className="w-full text-left rounded-2xl bg-white/10 border border-white/10 p-4 flex items-center gap-4 active:scale-[0.98] active:bg-white/15 transition"
+          >
+            <div className="w-11 h-11 rounded-xl bg-cyan-400/10 border border-cyan-300/20 flex items-center justify-center shrink-0 text-cyan-300">
+              <Icon size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-black">{id}</div>
+              <div className="text-xs text-white/45 mt-0.5 leading-snug">{desc}</div>
+            </div>
+            <ArrowLeft size={16} className="rotate-180 text-white/30 shrink-0" />
+          </button>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function JoinForm({ type, onSubmit, onBack }) {
+  const [name, setName]       = useState('');
+  const [email, setEmail]     = useState('');
+  const [company, setCompany] = useState('');
+  const [website, setWebsite] = useState('');
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const messagePlaceholder = {
+    'Startup':            'Tell us about your startup, stage and what you need…',
+    'Mentor':             'What areas can you mentor in? Availability?',
+    'Partnership':        'What kind of partnership are you interested in?',
+    'Cluster membership': 'Why do you want to join the cluster?',
+    'Other':              'How would you like to get involved?',
+  }[type] || 'Tell us more…';
+
+  async function handleSubmit() {
+    if (!name.trim() || !email.trim()) return;
+    setSubmitting(true);
+    await onSubmit({
+      name: name.trim(),
+      email: email.trim(),
+      company: company.trim() || null,
+      website: website.trim() || null,
+      message: message.trim() || null,
+    });
+  }
+
+  return (
+    <motion.div key="joinForm" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
+      <Back onClick={onBack} />
+      <div className="mt-5">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/10 border border-cyan-300/20 text-xs text-cyan-200 font-bold mb-3">
+          {type}
+        </div>
+        <h2 className="text-2xl font-black">Your details</h2>
+        <p className="text-white/50 mt-1 text-sm">The Madrid in Game team will be in touch.</p>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Name *</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Your full name"
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold" />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Email *</label>
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" type="email"
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold" />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Company / Organisation</label>
+          <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Where are you from?"
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold" />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Website</label>
+          <input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://yourwebsite.com" type="url"
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold" />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Tell us more</label>
+          <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder={messagePlaceholder} rows={3}
+            className="mt-1.5 w-full rounded-2xl bg-white/10 border border-white/10 px-4 py-3 outline-none text-sm font-semibold resize-none" />
+        </div>
+      </div>
+
+      <button
+        onClick={handleSubmit}
+        disabled={!name.trim() || !email.trim() || submitting}
+        className={classNames('mt-6 w-full rounded-2xl font-black py-4 transition', name.trim() && email.trim() ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/30 active:scale-[0.98]' : 'bg-white/10 text-white/40')}
+      >
+        {submitting ? 'Sending…' : 'Send to Madrid in Game'}
+      </button>
+    </motion.div>
   );
 }
 
