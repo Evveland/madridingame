@@ -231,7 +231,6 @@ export default function MadridInGameQuestPrototype() {
   const [query, setQuery] = useState('');
   const [redeemed, setRedeemed] = useState(false);
   const [dashboardStartupId, setDashboardStartupId] = useState('evveland');
-  const [savedDashboard, setSavedDashboard] = useState(false);
   const [dashboardAuth, setDashboardAuth] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
 
@@ -656,22 +655,10 @@ export default function MadridInGameQuestPrototype() {
             {screen === 'dashboard' && (
               <StartupDashboard
                 startup={dashboardStartup}
-                contacts={startupContacts[dashboardStartup.id] || []}
                 startups={startups}
                 dashboardStartupId={dashboardStartupId}
-                setDashboardStartupId={(id) => {
-                  setDashboardStartupId(id);
-                  setSavedDashboard(false);
-                }}
-                savedDashboard={savedDashboard}
-                onSave={() => {
-                  setSavedDashboard(true);
-                  setTimeout(() => setSavedDashboard(false), 1800);
-                }}
-                onSignOut={() => {
-                  setDashboardAuth(null);
-                  setScreen('splash');
-                }}
+                setDashboardStartupId={setDashboardStartupId}
+                onSignOut={() => { setDashboardAuth(null); setScreen('splash'); }}
                 locked={!!dashboardAuth}
               />
             )}
@@ -1111,11 +1098,74 @@ function PinPad({ onSuccess, onBack }) {
   );
 }
 
-function StartupDashboard({ startup, contacts, startups, dashboardStartupId, setDashboardStartupId, savedDashboard, onSave, onSignOut, locked }) {
-  const questViews = 42 + contacts.length * 11;
-  const completions = 18 + contacts.length * 4;
-  const conversion = Math.round((completions / questViews) * 100);
-  const hotLeads = contacts.filter((c) => c.status === 'Hot lead').length;
+function StartupDashboard({ startup: staticStartup, startups, dashboardStartupId, setDashboardStartupId, onSignOut, locked }) {
+  const [form, setForm]         = useState({});
+  const [contacts, setContacts] = useState([]);
+  const [questViews, setQuestViews] = useState(0);
+  const [loadingData, setLoadingData] = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [saved, setSaved]       = useState(false);
+
+  useEffect(() => {
+    if (staticStartup?.id) loadAll(staticStartup.id);
+  }, [staticStartup?.id]);
+
+  async function loadAll(id) {
+    setLoadingData(true);
+    const [{ data: p }, { data: c }, { count }] = await Promise.all([
+      supabase.from('startup_profiles').select('*').eq('startup_id', id).maybeSingle(),
+      supabase.from('contacts').select('*').eq('startup_id', id).order('created_at', { ascending: false }),
+      supabase.from('quest_completions').select('*', { count: 'exact', head: true }).eq('startup_id', id),
+    ]);
+    const src = p || staticStartup;
+    setForm({
+      name:        src.name        || '',
+      founder:     src.founder     || '',
+      category:    src.category    || '',
+      booth:       src.booth       || '',
+      description: src.description || '',
+      mission:     src.mission     || '',
+      question:    src.question    || '',
+      answer:      src.answer      || staticStartup.answer || '',
+      social_task: src.social_task || src.socialTask || '',
+    });
+    setContacts(c || []);
+    setQuestViews(count || 0);
+    setLoadingData(false);
+  }
+
+  function setField(key, val) { setForm(f => ({ ...f, [key]: val })); }
+
+  async function saveProfile() {
+    setSaving(true);
+    await supabase.from('startup_profiles').upsert(
+      { startup_id: staticStartup.id, ...form, updated_at: new Date().toISOString() },
+      { onConflict: 'startup_id' }
+    );
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  async function updateContactStatus(id, status) {
+    await supabase.from('contacts').update({ status }).eq('id', id);
+    setContacts(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+  }
+
+  function downloadCSV() {
+    const headers = ['Name', 'Company', 'Email', 'Type', 'Interest', 'Status', 'Date'];
+    const rows = contacts.map(c => [c.name, c.company, c.email, c.type, c.interest, c.status, c.created_at?.slice(0, 10)]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${staticStartup.id}-leads.csv`;
+    a.click();
+  }
+
+  const hotLeads  = contacts.filter(c => c.status === 'Hot lead').length;
+  const followUps = contacts.filter(c => c.status === 'Follow up').length;
+  const conversion = questViews > 0 ? Math.round((contacts.length / questViews) * 100) : 0;
 
   return (
     <motion.div key="dashboard" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} className="px-5 pt-4 pb-6">
@@ -1128,10 +1178,7 @@ function StartupDashboard({ startup, contacts, startups, dashboardStartupId, set
           <p className="text-white/60 mt-1">Manage profile data, quest info and event contacts.</p>
         </div>
         {locked && (
-          <button
-            onClick={onSignOut}
-            className="shrink-0 mt-1 flex items-center gap-1.5 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-xs font-bold text-white/60 active:scale-95 transition"
-          >
+          <button onClick={onSignOut} className="shrink-0 mt-1 flex items-center gap-1.5 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-xs font-bold text-white/60 active:scale-95 transition">
             <Lock size={13} /> Sign out
           </button>
         )}
@@ -1140,114 +1187,130 @@ function StartupDashboard({ startup, contacts, startups, dashboardStartupId, set
       {!locked && (
         <div className="mt-5 rounded-3xl bg-white/10 border border-white/10 p-4">
           <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Select startup</label>
-          <select
-            value={dashboardStartupId}
-            onChange={(e) => setDashboardStartupId(e.target.value)}
-            className="mt-2 w-full rounded-2xl bg-black/40 border border-white/10 px-4 py-3 outline-none font-bold"
-          >
-            {[...startups]
-              .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
-              .map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
+          <select value={dashboardStartupId} onChange={e => setDashboardStartupId(e.target.value)}
+            className="mt-2 w-full rounded-2xl bg-black/40 border border-white/10 px-4 py-3 outline-none font-bold">
+            {[...startups].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
           </select>
         </div>
       )}
 
-      <div className={classNames('mt-5 rounded-3xl bg-gradient-to-br p-5 shadow-xl relative overflow-hidden', startup.color)}>
+      <div className={classNames('mt-5 rounded-3xl bg-gradient-to-br p-5 shadow-xl relative overflow-hidden', staticStartup.color)}>
         <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/20 rounded-full blur-xl" />
         <div className="relative">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-bold uppercase tracking-widest text-white/75">{startup.category}</div>
-              <h3 className="text-3xl font-black mt-1">{startup.name}</h3>
-            </div>
-            <Pencil size={22} />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-sm font-semibold">
-            <div className="flex items-center gap-2"><UserRound size={15} /> {startup.founder}</div>
-            <div className="flex items-center gap-2"><MapPin size={15} /> {startup.booth}</div>
+          <div className="text-xs font-bold uppercase tracking-widest text-white/75">{form.category || staticStartup.category}</div>
+          <h3 className="text-3xl font-black mt-1">{form.name || staticStartup.name}</h3>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm font-semibold">
+            <div className="flex items-center gap-2"><UserRound size={15} />{form.founder || staticStartup.founder}</div>
+            <div className="flex items-center gap-2"><MapPin size={15} />{form.booth || staticStartup.booth}</div>
           </div>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-4 gap-2">
-        <DashboardStat icon={Eye} label="Views" value={questViews} />
-        <DashboardStat icon={CheckCircle2} label="Done" value={completions} />
-        <DashboardStat icon={BarChart3} label="Conv." value={`${conversion}%`} />
-        <DashboardStat icon={Users} label="Leads" value={contacts.length} />
+        <DashboardStat icon={Eye}         label="Quests"  value={questViews} />
+        <DashboardStat icon={CheckCircle2} label="Leads"   value={contacts.length} />
+        <DashboardStat icon={BarChart3}   label="Conv."   value={`${conversion}%`} />
+        <DashboardStat icon={Users}       label="Hot"     value={hotLeads} />
       </div>
 
+      {/* ── Editable profile ── */}
       <div className="mt-5 rounded-3xl bg-white/10 border border-white/10 p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="font-black text-xl">Manage Startup Data</h3>
-          <button onClick={onSave} className="rounded-xl bg-cyan-400 text-slate-950 px-3 py-2 text-xs font-black flex items-center gap-1">
-            <Save size={14} /> Save
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-black text-xl">Startup Profile</h3>
+          <button onClick={saveProfile} disabled={saving || loadingData}
+            className="rounded-xl bg-cyan-400 text-slate-950 px-3 py-2 text-xs font-black flex items-center gap-1 active:scale-95 transition disabled:opacity-50">
+            <Save size={14} /> {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
-        {savedDashboard && (
-          <div className="mt-3 rounded-2xl bg-emerald-400/15 border border-emerald-300/20 text-emerald-200 px-3 py-2 text-sm font-bold">
-            Changes saved in prototype.
+        {saved && (
+          <div className="mb-4 rounded-2xl bg-emerald-400/15 border border-emerald-300/20 text-emerald-200 px-3 py-2 text-sm font-bold flex items-center gap-2">
+            <CheckCircle2 size={15} /> Saved to database
           </div>
         )}
-        <div className="mt-4 space-y-3">
-          <EditableField label="Startup name" value={startup.name} />
-          <EditableField label="Founder / role" value={startup.founder} />
-          <EditableField label="Category" value={startup.category} />
-          <EditableField label="Booth location" value={startup.booth} />
-          <EditableTextarea label="Short description" value={startup.description} />
-          <EditableTextarea label="Founder secret question" value={startup.question} />
-          <EditableField label="Accepted secret answer" value={startup.answer} />
-          <EditableTextarea label="Optional social task" value={startup.socialTask} />
-        </div>
+        {loadingData ? (
+          <p className="text-white/40 text-sm text-center py-4">Loading…</p>
+        ) : (
+          <div className="space-y-3">
+            <EditableField    label="Startup name"          value={form.name}        onChange={v => setField('name', v)} />
+            <EditableField    label="Founder / role"        value={form.founder}     onChange={v => setField('founder', v)} />
+            <EditableField    label="Category"              value={form.category}    onChange={v => setField('category', v)} />
+            <EditableField    label="Booth location"        value={form.booth}       onChange={v => setField('booth', v)} />
+            <EditableTextarea label="Short description"     value={form.description} onChange={v => setField('description', v)} />
+            <EditableTextarea label="Quest mission text"    value={form.mission}     onChange={v => setField('mission', v)} />
+            <EditableTextarea label="Secret question"       value={form.question}    onChange={v => setField('question', v)} />
+            <EditableField    label="Accepted answer"       value={form.answer}      onChange={v => setField('answer', v)} />
+            <EditableTextarea label="Optional social task"  value={form.social_task} onChange={v => setField('social_task', v)} />
+          </div>
+        )}
       </div>
 
+      {/* ── Contacts & Leads ── */}
       <div className="mt-5 rounded-3xl bg-white/10 border border-white/10 p-5">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="font-black text-xl">Contacts & Leads</h3>
-            <p className="text-white/50 text-sm mt-1">Visitors who completed or interacted with this startup quest.</p>
+            <p className="text-white/50 text-sm mt-0.5">People who shared their details at your booth.</p>
           </div>
-          <button className="rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-xs font-black flex items-center gap-1">
+          <button onClick={downloadCSV} disabled={contacts.length === 0}
+            className="rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-xs font-black flex items-center gap-1 disabled:opacity-40">
             <Download size={14} /> CSV
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 mb-4">
           <div className="rounded-2xl bg-black/20 border border-white/10 p-3">
             <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Hot leads</div>
             <div className="text-2xl font-black text-cyan-300">{hotLeads}</div>
           </div>
           <div className="rounded-2xl bg-black/20 border border-white/10 p-3">
             <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Follow-ups</div>
-            <div className="text-2xl font-black text-cyan-300">{contacts.filter((c) => c.status === 'Follow up').length}</div>
+            <div className="text-2xl font-black text-cyan-300">{followUps}</div>
           </div>
         </div>
 
-        <div className="mt-4 space-y-3">
-          {contacts.map((contact) => (
-            <div key={contact.email} className="rounded-2xl bg-black/20 border border-white/10 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-black">{contact.name}</div>
-                  <div className="text-xs text-cyan-200 font-bold mt-1">{contact.type} · {contact.company}</div>
+        {loadingData ? (
+          <p className="text-white/40 text-sm text-center py-4">Loading…</p>
+        ) : contacts.length === 0 ? (
+          <p className="text-white/30 text-sm text-center py-6">No contacts yet — share your booth QR!</p>
+        ) : (
+          <div className="space-y-3">
+            {contacts.map(contact => (
+              <div key={contact.id} className="rounded-2xl bg-black/20 border border-white/10 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-black truncate">{contact.name}</div>
+                    <div className="text-xs text-cyan-200 font-bold mt-0.5 truncate">{[contact.type, contact.company].filter(Boolean).join(' · ')}</div>
+                    {contact.email && <div className="text-xs text-white/45 mt-0.5 truncate">{contact.email}</div>}
+                  </div>
+                  <select
+                    value={contact.status || 'New'}
+                    onChange={e => updateContactStatus(contact.id, e.target.value)}
+                    className={classNames('shrink-0 rounded-full px-2 py-1 text-[10px] font-black outline-none cursor-pointer',
+                      contact.status === 'Hot lead'  ? 'bg-emerald-400 text-slate-950' :
+                      contact.status === 'Follow up' ? 'bg-cyan-400 text-slate-950'    : 'bg-white/10 text-white/70')}
+                  >
+                    <option>New</option>
+                    <option>Follow up</option>
+                    <option>Hot lead</option>
+                    <option>Closed</option>
+                  </select>
                 </div>
-                <span className={classNames('rounded-full px-2 py-1 text-[10px] font-black', contact.status === 'Hot lead' ? 'bg-emerald-400 text-slate-950' : contact.status === 'Follow up' ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-white/70')}>
-                  {contact.status}
-                </span>
+                {contact.interest && <div className="mt-2 text-xs text-white/55 leading-snug">"{contact.interest}"</div>}
+                <div className="mt-3 flex gap-2">
+                  <a href={`mailto:${contact.email}`}
+                    className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition">
+                    <Mail size={13} /> Email
+                  </a>
+                  <div className="flex-1 rounded-xl bg-white/5 border border-white/5 py-2 text-xs font-bold flex items-center justify-center gap-1 text-white/30">
+                    <Sparkles size={13} /> {contact.created_at?.slice(0, 10) || '—'}
+                  </div>
+                </div>
               </div>
-              <div className="mt-3 text-sm text-white/65">Interest: {contact.interest}</div>
-              <div className="mt-3 flex gap-2">
-                <button className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold flex items-center justify-center gap-1">
-                  <Mail size={13} /> Email
-                </button>
-                <button className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold flex items-center justify-center gap-1">
-                  <Phone size={13} /> Contact
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -1263,26 +1326,28 @@ function DashboardStat({ icon: Icon, label, value }) {
   );
 }
 
-function EditableField({ label, value }) {
+function EditableField({ label, value, onChange }) {
   return (
     <div>
       <label className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{label}</label>
       <input
-        defaultValue={value}
-        className="mt-1 w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 outline-none text-sm"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="mt-1 w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 outline-none text-sm focus:border-cyan-400/50 transition"
       />
     </div>
   );
 }
 
-function EditableTextarea({ label, value }) {
+function EditableTextarea({ label, value, onChange }) {
   return (
     <div>
       <label className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{label}</label>
       <textarea
-        defaultValue={value}
+        value={value}
+        onChange={e => onChange(e.target.value)}
         rows={3}
-        className="mt-1 w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 outline-none text-sm resize-none"
+        className="mt-1 w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 outline-none text-sm resize-none focus:border-cyan-400/50 transition"
       />
     </div>
   );
