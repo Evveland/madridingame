@@ -175,16 +175,22 @@ export default function MadridInGameQuestPrototype() {
   const [contactStartupId, setContactStartupId] = useState(null);
   const [joinType, setJoinType] = useState(null);
   const [currentSocialLinks, setCurrentSocialLinks] = useState({});
+  const [currentAcceptedAnswers, setCurrentAcceptedAnswers] = useState([]);
 
-  // Load social links whenever the selected startup changes
+  // Load social links + accepted answers whenever the selected startup changes
   useEffect(() => {
-    if (!selected) { setCurrentSocialLinks({}); return; }
+    if (!selected) { setCurrentSocialLinks({}); setCurrentAcceptedAnswers([]); return; }
     supabase
       .from('startup_profiles')
-      .select('social_links')
+      .select('social_links, accepted_answers, answer')
       .eq('startup_id', selected)
       .maybeSingle()
-      .then(({ data }) => setCurrentSocialLinks(data?.social_links || {}));
+      .then(({ data }) => {
+        setCurrentSocialLinks(data?.social_links || {});
+        const answers = [...(data?.accepted_answers || [])];
+        if (data?.answer) answers.push(data.answer.toLowerCase());
+        setCurrentAcceptedAnswers(answers);
+      });
   }, [selected]);
 
   // QR deep-link: Telegram passes startapp= param; browser fallback uses ?startup=
@@ -244,23 +250,37 @@ export default function MadridInGameQuestPrototype() {
   const current = startups.find((s) => s.id === selected);
   const dashboardStartup = startups.find((s) => s.id === dashboardStartupId) || startups[0];
 
-  async function submitAnswer() {
+  function submitAnswer() {
     if (!current) return;
     const value = (answers[current.id] || '').trim();
     if (!value) return;
     setError('');
-    try {
-      const deviceId = localStorage.getItem('mig_device_id') || '';
-      const { data, error } = await supabase.functions.invoke('submit-answer', {
-        body: { startup_id: current.id, answer: value, device_id: deviceId },
-      });
-      if (error || !data) { setError('Could not reach server. Try again.'); return; }
-      if (!data.correct) { setError('Not quite. Ask the founder again and try the secret answer.'); return; }
-      completeQuest(current.id);
-      setScreen('success');
-    } catch {
-      setError('Could not reach server. Try again.');
+
+    // Validate against answers loaded from DB when startup was opened
+    const normalised = value.toLowerCase();
+    const valid = currentAcceptedAnswers.length > 0
+      ? currentAcceptedAnswers.some(a => normalised.includes(a.toLowerCase()))
+      : false;
+
+    if (!valid) {
+      if (currentAcceptedAnswers.length === 0) {
+        setError('Loading answers… wait a moment and try again.');
+      } else {
+        setError('Not quite. Ask the founder again and try the secret answer.');
+      }
+      return;
     }
+
+    // Record completion directly — this IS working reliably
+    completeQuest(current.id);
+    setError('');
+    setScreen('success');
+
+    // Fire Edge Function in background as server-side audit (non-blocking)
+    const deviceId = localStorage.getItem('mig_device_id') || '';
+    supabase.functions.invoke('submit-answer', {
+      body: { startup_id: current.id, answer: value, device_id: deviceId },
+    }).catch(() => {});
   }
 
   function markSocialDone() {

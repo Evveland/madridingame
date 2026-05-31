@@ -113,21 +113,25 @@ export function usePlayer() {
   async function completeQuest(startupId) {
     const p = playerRef.current;
     if (!p) return;
-    await supabase.from('quest_completions').upsert(
-      { player_id: p.id, startup_id: startupId },
-      { onConflict: 'player_id,startup_id' },
-    );
+    // Update local state immediately so UI responds without waiting for DB
     setCompleted(prev => ({ ...prev, [startupId]: true }));
+    // Persist to DB
+    const { error } = await supabase.from('quest_completions').upsert(
+      { player_id: p.id, startup_id: startupId },
+      { onConflict: 'player_id,startup_id', ignoreDuplicates: true },
+    );
+    if (error) console.error('completeQuest DB error:', error);
   }
 
   async function completeSocial(startupId) {
     const p = playerRef.current;
     if (!p) return;
-    await supabase.from('social_completions').upsert(
-      { player_id: p.id, startup_id: startupId },
-      { onConflict: 'player_id,startup_id' },
-    );
     setSocialDone(prev => ({ ...prev, [startupId]: true }));
+    const { error } = await supabase.from('social_completions').upsert(
+      { player_id: p.id, startup_id: startupId },
+      { onConflict: 'player_id,startup_id', ignoreDuplicates: true },
+    );
+    if (error) console.error('completeSocial DB error:', error);
   }
 
   async function saveProfile(profileValue) {
