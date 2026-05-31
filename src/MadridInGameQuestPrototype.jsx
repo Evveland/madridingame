@@ -1459,6 +1459,91 @@ const STATUS_COLORS = {
   'Closed':    'bg-white/20 text-white/40',
 };
 
+const TG_BASE = 'https://t.me/madridingame_bot/open';
+
+function AllBoothQRs() {
+  const [qrMap, setQrMap] = useState({});
+
+  useEffect(() => {
+    import('qrcode').then(QRCode => {
+      startups.forEach(s => {
+        QRCode.default.toDataURL(`${TG_BASE}?startapp=${s.id}`, {
+          width: 200, margin: 2,
+          color: { dark: '#0f172a', light: '#ffffff' },
+          errorCorrectionLevel: 'M',
+        }).then(url => setQrMap(prev => ({ ...prev, [s.id]: url })));
+      });
+    });
+  }, []);
+
+  function downloadAll() {
+    startups.forEach(s => {
+      const url = qrMap[s.id];
+      if (!url) return;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${s.id}-booth-qr.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  }
+
+  const allReady = startups.every(s => qrMap[s.id]);
+
+  return (
+    <div className="mt-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-black text-xl">All Booth QR Codes</h3>
+          <p className="text-white/50 text-xs mt-0.5">Telegram deep links — scan opens the Mini App directly.</p>
+        </div>
+        <button onClick={downloadAll} disabled={!allReady}
+          className="flex items-center gap-1.5 rounded-xl bg-cyan-400 text-slate-950 px-3 py-2 text-xs font-black disabled:opacity-40 active:scale-95 transition">
+          <Download size={14} /> All
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {startups.map(s => (
+          <div key={s.id} className={classNames('rounded-2xl border overflow-hidden', s.color.replace('from-', 'border-').split(' ')[0] + '/30 bg-white/5 border-white/10')}>
+            <div className="flex items-center gap-3 p-3">
+              {/* QR thumbnail */}
+              <div className="shrink-0 bg-white rounded-xl p-1.5">
+                {qrMap[s.id]
+                  ? <img src={qrMap[s.id]} alt={s.name} className="w-16 h-16" />
+                  : <div className="w-16 h-16 flex items-center justify-center"><QrCode size={24} className="text-slate-300 animate-pulse" /></div>
+                }
+              </div>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="font-black truncate">{s.name}</div>
+                <div className="text-xs text-white/50 mt-0.5">{s.booth}</div>
+                <div className="text-[10px] font-mono text-cyan-300/70 mt-1 truncate">{TG_BASE}?startapp={s.id}</div>
+              </div>
+              {/* Download single */}
+              {qrMap[s.id] && (
+                <button
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = qrMap[s.id];
+                    a.download = `${s.id}-booth-qr.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  }}
+                  className="shrink-0 rounded-xl bg-white/10 border border-white/10 p-2 active:scale-95 transition">
+                  <Download size={16} className="text-white/60" />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MigAdminScreen({ onSignOut }) {
   const db = useMigLeads();
   const rdm = useRedemptions();
@@ -1481,7 +1566,7 @@ function MigAdminScreen({ onSignOut }) {
 
       {/* Tab switcher */}
       <div className="mt-4 flex gap-2">
-        {[['leads', 'Join Leads'], ['merch', 'Merch Desk']].map(([id, label]) => (
+        {[['leads', 'Join Leads'], ['merch', 'Merch Desk'], ['qr', 'QR Codes']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={classNames('flex-1 rounded-2xl py-3 text-sm font-black transition', tab === id ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-white/60')}>
             {label}
@@ -1620,6 +1705,11 @@ function MigAdminScreen({ onSignOut }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── QR CODES TAB ── */}
+      {tab === 'qr' && (
+        <AllBoothQRs />
       )}
 
       {/* ── LEADS TAB ── */}
