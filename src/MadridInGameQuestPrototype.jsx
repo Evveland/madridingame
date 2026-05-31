@@ -274,7 +274,7 @@ export default function MadridInGameQuestPrototype() {
       const { data } = await supabase
         .from('leaderboard')
         .select('*')
-        .gt('xp', 50)
+        .gte('xp', 50)
         .order('xp', { ascending: false })
         .limit(20);
       const rows = data || [];
@@ -290,7 +290,7 @@ export default function MadridInGameQuestPrototype() {
           const { data: full } = await supabase
             .from('leaderboard')
             .select('player_id')
-            .gt('xp', 50)
+            .gte('xp', 50)
             .order('xp', { ascending: false });
           const pos = (full || []).findIndex(r => r.player_id === player.id);
           setMyRank(pos >= 0 ? pos + 1 : null);
