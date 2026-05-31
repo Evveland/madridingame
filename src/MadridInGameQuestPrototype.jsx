@@ -187,10 +187,11 @@ export default function MadridInGameQuestPrototype() {
       .then(({ data }) => setCurrentSocialLinks(data?.social_links || {}));
   }, [selected]);
 
-  // QR deep-link: ?startup=evveland → open that startup's quest page
+  // QR deep-link: Telegram passes startapp= param; browser fallback uses ?startup=
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const sid = params.get('startup');
+    const tgParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+    const urlParam = new URLSearchParams(window.location.search).get('startup');
+    const sid = tgParam || urlParam;
     if (!sid) return;
     const found = startups.find(s => s.id === sid);
     if (!found) return;
