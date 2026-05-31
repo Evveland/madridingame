@@ -544,8 +544,8 @@ export default function MadridInGameQuestPrototype() {
                   <h2 className="text-3xl font-black">Visit the Booth</h2>
                   <p className="text-white/60 mt-3 leading-relaxed">Ask the founder to show their QR code, then scan it with your <strong className="text-white">phone's camera app</strong> — it will open this quest automatically and award <span className="text-cyan-300 font-black">+{XP.VISIT_BOOTH} XP</span>.</p>
                 </div>
-                <div className="mt-5 rounded-2xl bg-amber-400/10 border border-amber-300/20 px-4 py-3 text-sm text-amber-200">
-                  📷 Use your native camera — not the app. Point it at the QR and tap the link that appears.
+                <div className="mt-5 rounded-2xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white/60">
+                  Scan the founder's QR with your camera to open this quest automatically, or tap the button below if you're already at the booth.
                 </div>
                 <div className="mt-4 space-y-3">
                   {[
@@ -562,12 +562,22 @@ export default function MadridInGameQuestPrototype() {
                     </div>
                   ))}
                 </div>
-                {hasAction('visit_booth', current.id) && (
+                {hasAction('visit_booth', current.id) ? (
                   <div className="mt-5 rounded-2xl bg-emerald-400/10 border border-emerald-300/20 text-emerald-300 font-bold py-4 flex items-center justify-center gap-2 text-sm">
-                    <CheckCircle2 size={17} /> Booth already visited · +{XP.VISIT_BOOTH} XP earned
+                    <CheckCircle2 size={17} /> Booth visited · +{XP.VISIT_BOOTH} XP earned
                   </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      recordAction('visit_booth', current.id, XP.VISIT_BOOTH);
+                      setScreen('startup');
+                    }}
+                    className="mt-5 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4 shadow-lg shadow-cyan-500/30 active:scale-[0.98] transition"
+                  >
+                    ✓ I'm at the booth — +{XP.VISIT_BOOTH} XP
+                  </button>
                 )}
-                <button onClick={() => setScreen('startup')} className="mt-4 w-full rounded-2xl bg-white/10 border border-white/10 font-bold py-4">
+                <button onClick={() => setScreen('startup')} className="mt-3 w-full rounded-2xl bg-white/10 border border-white/10 font-bold py-4">
                   Back to Quest
                 </button>
               </motion.div>
