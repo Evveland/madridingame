@@ -521,13 +521,16 @@ export default function MadridInGameQuestPrototype() {
                     <QrCode size={36} className="text-cyan-300" />
                   </div>
                   <h2 className="text-3xl font-black">Visit the Booth</h2>
-                  <p className="text-white/60 mt-3 leading-relaxed">Ask the founder to show you their QR code, then scan it with your phone camera to unlock this quest and earn <span className="text-cyan-300 font-black">+{XP.VISIT_BOOTH} XP</span>.</p>
+                  <p className="text-white/60 mt-3 leading-relaxed">Ask the founder to show their QR code, then scan it with your <strong className="text-white">phone's camera app</strong> — it will open this quest automatically and award <span className="text-cyan-300 font-black">+{XP.VISIT_BOOTH} XP</span>.</p>
                 </div>
-                <div className="mt-8 space-y-3">
+                <div className="mt-5 rounded-2xl bg-amber-400/10 border border-amber-300/20 px-4 py-3 text-sm text-amber-200">
+                  📷 Use your native camera — not the app. Point it at the QR and tap the link that appears.
+                </div>
+                <div className="mt-4 space-y-3">
                   {[
-                    ['1', 'Find the booth', current.booth],
-                    ['2', 'Ask the founder', `Show me your QR code`],
-                    ['3', 'Scan with camera', 'Opens this quest automatically'],
+                    ['1', 'Go to the booth', current.booth],
+                    ['2', 'Ask the founder', 'Show me your QR code'],
+                    ['3', 'Open camera app', 'Scan the QR → tap the link'],
                   ].map(([n, title, sub]) => (
                     <div key={n} className="flex items-center gap-4 rounded-2xl bg-white/10 border border-white/10 px-4 py-3">
                       <div className="w-8 h-8 rounded-full bg-cyan-400 text-slate-950 font-black flex items-center justify-center shrink-0 text-sm">{n}</div>
@@ -1684,11 +1687,16 @@ function MigAdminScreen({ onSignOut }) {
               </div>
               {lead.message && <p className="mt-2 text-xs text-white/50 leading-snug line-clamp-2">"{lead.message}"</p>}
               <div className="mt-3 flex gap-2">
-                <a href={`mailto:${lead.email}`}
-                  className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition">
-                  <Mail size={13} /> Email
-                </a>
-                <div className="text-xs text-white/30 flex items-center px-3">{lead.created_at?.slice(0, 10)}</div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(lead.email).catch(() => {});
+                    window.Telegram?.WebApp?.openLink?.(`mailto:${lead.email}`);
+                  }}
+                  className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition truncate px-2">
+                  <Mail size={13} className="shrink-0" />
+                  <span className="truncate">{lead.email}</span>
+                </button>
+                <div className="text-xs text-white/30 flex items-center px-3 shrink-0">{lead.created_at?.slice(0, 10)}</div>
               </div>
             </div>
           ))
@@ -1702,10 +1710,17 @@ function MigAdminScreen({ onSignOut }) {
 function BoothQR({ startup, qrDataUrl, boothUrl }) {
   function downloadPNG() {
     if (!qrDataUrl) return;
-    const a = document.createElement('a');
-    a.href = qrDataUrl;
-    a.download = `${startup.id}-booth-qr.png`;
-    a.click();
+    // Telegram Mini App: use openLink; browser fallback: open in new tab
+    if (window.Telegram?.WebApp?.openLink) {
+      window.Telegram.WebApp.openLink(qrDataUrl);
+    } else {
+      const a = document.createElement('a');
+      a.href = qrDataUrl;
+      a.download = `${startup.id}-booth-qr.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   }
 
   return (
@@ -1907,14 +1922,14 @@ function StartupDashboard({ startup, startups, dashboardStartupId, setDashboardS
 
         <div className="grid grid-cols-4 gap-2 mb-4">
           {[
-            { label: 'New',       value: newLeads,  color: 'text-white/70'       },
-            { label: 'Follow up', value: followUps, color: 'text-cyan-300'       },
-            { label: 'Hot lead',  value: hotLeads,  color: 'text-emerald-300'    },
-            { label: 'Closed',    value: closed,    color: 'text-white/30'       },
+            { label: 'New',       value: newLeads,  color: 'text-white/70'    },
+            { label: 'Follow up', value: followUps, color: 'text-cyan-300'    },
+            { label: 'Hot lead',  value: hotLeads,  color: 'text-emerald-300' },
+            { label: 'Closed',    value: closed,    color: 'text-white/30'    },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-2xl bg-black/20 border border-white/10 p-3 text-center">
               <div className="text-[9px] uppercase tracking-widest text-white/35 font-bold leading-tight">{label}</div>
-              <div className={classNames('text-2xl font-black mt-1', color)}>{value}</div>
+              <div className={classNames('text-xl font-black mt-1 tabular-nums', color)}>{value}</div>
             </div>
           ))}
         </div>
@@ -1933,27 +1948,35 @@ function StartupDashboard({ startup, startups, dashboardStartupId, setDashboardS
                     <div className="text-xs text-cyan-200 font-bold mt-0.5 truncate">{[contact.type, contact.company].filter(Boolean).join(' · ')}</div>
                     {contact.email && <div className="text-xs text-white/45 mt-0.5 truncate">{contact.email}</div>}
                   </div>
-                  <select
-                    value={contact.status || 'New'}
-                    onChange={e => updateContactStatus(contact.id, e.target.value)}
-                    className={classNames('shrink-0 rounded-full px-2 py-1 text-[10px] font-black outline-none cursor-pointer',
+                  <button
+                    onClick={() => {
+                      const cycle = ['New', 'Follow up', 'Hot lead', 'Closed'];
+                      const next = cycle[(cycle.indexOf(contact.status || 'New') + 1) % cycle.length];
+                      updateContactStatus(contact.id, next);
+                    }}
+                    className={classNames('shrink-0 rounded-full px-2 py-1 text-[10px] font-black active:scale-95 transition',
                       contact.status === 'Hot lead'  ? 'bg-emerald-400 text-slate-950' :
-                      contact.status === 'Follow up' ? 'bg-cyan-400 text-slate-950'    : 'bg-white/10 text-white/70')}
+                      contact.status === 'Follow up' ? 'bg-cyan-400 text-slate-950'    :
+                      contact.status === 'Closed'    ? 'bg-white/10 text-white/30'     : 'bg-white/10 text-white/70')}
                   >
-                    <option>New</option>
-                    <option>Follow up</option>
-                    <option>Hot lead</option>
-                    <option>Closed</option>
-                  </select>
+                    {contact.status || 'New'} ›
+                  </button>
                 </div>
                 {contact.interest && <div className="mt-2 text-xs text-white/55 leading-snug">"{contact.interest}"</div>}
                 <div className="mt-3 flex gap-2">
-                  <a href={`mailto:${contact.email}`}
-                    className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition">
-                    <Mail size={13} /> Email
-                  </a>
-                  <div className="flex-1 rounded-xl bg-white/5 border border-white/5 py-2 text-xs font-bold flex items-center justify-center gap-1 text-white/30">
-                    <Sparkles size={13} /> {contact.created_at?.slice(0, 10) || '—'}
+                  <button
+                    onClick={() => {
+                      if (contact.email) {
+                        navigator.clipboard?.writeText(contact.email).catch(() => {});
+                        window.Telegram?.WebApp?.openLink?.(`mailto:${contact.email}`);
+                      }
+                    }}
+                    className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition truncate px-2">
+                    <Mail size={13} className="shrink-0" />
+                    <span className="truncate">{contact.email || '—'}</span>
+                  </button>
+                  <div className="shrink-0 rounded-xl bg-white/5 border border-white/5 px-3 py-2 text-xs font-bold flex items-center gap-1 text-white/30">
+                    {contact.created_at?.slice(0, 10) || '—'}
                   </div>
                 </div>
               </div>
