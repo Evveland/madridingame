@@ -36,13 +36,6 @@ function getTelegramUser() {
   return null;
 }
 
-function makeCode() {
-  return 'MIG-' + Array.from(crypto.getRandomValues(new Uint8Array(5)))
-    .map(b => b.toString(36).toUpperCase().padStart(2, '0'))
-    .join('')
-    .slice(0, 8);
-}
-
 export function usePlayer() {
   const [player, setPlayer]               = useState(null);
   const [telegramUser, setTelegramUser]   = useState(null);
@@ -144,27 +137,25 @@ export function usePlayer() {
     setPlayer(prev => ({ ...prev, profile: profileValue }));
   }
 
-  // reward = { name, xp } — generates a code and deducts xp from the player
+  // reward = { name, xp } — server-side XP validation + code issuance
   async function generateRedemptionCode(reward) {
-    const p = playerRef.current;
-    if (!p) return null;
+    const deviceId = getDeviceId();
     if (redemptionCodes[reward.name]) return redemptionCodes[reward.name];
 
-    for (let i = 0; i < 2; i++) {
-      const code = makeCode();
-      const { data, error } = await supabase
-        .from('redemption_codes')
-        .insert({ player_id: p.id, xp: reward.xp, code, reward_name: reward.name, reward_cost: reward.xp })
-        .select('code,xp,used,used_at,reward_name,reward_cost')
-        .single();
-      if (!error && data) {
-        setRedemptionCodes(prev => ({ ...prev, [reward.name]: data }));
-        // Deduct the reward cost from XP balance
-        await recordAction('spend_xp', reward.name, -reward.xp);
-        return data;
-      }
-    }
-    return null;
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-redemption', {
+        body: { device_id: deviceId, reward_name: reward.name, reward_cost: reward.xp },
+      });
+      if (error || !data?.code) return null;
+      const row = { code: data.code, xp: reward.xp, used: data.used ?? false, reward_name: reward.name, reward_cost: reward.xp };
+      setRedemptionCodes(prev => ({ ...prev, [reward.name]: row }));
+      // Sync local actions so XP deduction reflects immediately client-side
+      setActions(prev => [
+        ...prev.filter(a => !(a.action_type === 'spend_xp' && a.reference_id === reward.name)),
+        { action_type: 'spend_xp', reference_id: reward.name, xp_earned: -reward.xp },
+      ]);
+      return row;
+    } catch { return null; }
   }
 
   async function submitContact({ startupId, name, company, email, type, interest }) {

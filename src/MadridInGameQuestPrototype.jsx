@@ -21,10 +21,7 @@ const startups = [
     description: 'Interactive experiences that connect audiences, culture and immersive storytelling.',
     mission: 'Discover how live experiences can become playable moments.',
     question: 'Ask the founder: What type of experience first inspired 101 Experience?',
-    answer: 'festival',
-    accepted: ['festival', 'live event', 'event', 'cultural event'],
     socialTask: 'Scan their project QR or follow their social channel.',
-    pin: '1011',
   },
   {
     id: 'cyberzen',
@@ -37,10 +34,7 @@ const startups = [
     description: 'Games designed to help people regulate emotions, focus and wellbeing.',
     mission: 'Learn how games can support better mental states.',
     question: 'Ask the founder: What emotional state does Cyberzen most want to help players improve?',
-    answer: 'calm',
-    accepted: ['calm', 'stress', 'anxiety', 'focus', 'wellbeing'],
     socialTask: 'Follow Cyberzen or scan their demo QR.',
-    pin: '2727',
   },
   {
     id: 'gamestrategies',
@@ -53,10 +47,7 @@ const startups = [
     description: 'Game-based solutions for learning, strategy and corporate transformation.',
     mission: 'Find out how companies can train better through games.',
     question: 'Ask the founder: What corporate skill is easier to teach through games?',
-    answer: 'leadership',
-    accepted: ['leadership', 'teamwork', 'negotiation', 'strategy', 'compliance'],
     socialTask: 'Ask for a business card or scan the company QR.',
-    pin: '3636',
   },
   {
     id: 'neuhera',
@@ -69,10 +60,7 @@ const startups = [
     description: 'Immersive VR and AI therapies focused on child development and attention.',
     mission: 'Discover how immersive technology can support therapy.',
     question: 'Ask the founder: What child-development challenge is Neuhera focused on?',
-    answer: 'ADHD',
-    accepted: ['adhd', 'tdah', 'attention', 'attention deficit'],
     socialTask: "Scan Neuhera's demo QR at the booth.",
-    pin: '4545',
   },
   {
     id: 'unreality',
@@ -85,10 +73,7 @@ const startups = [
     description: 'A platform, puzzle and survival game world inspired by atmospheric environments.',
     mission: "Explore the world behind Unreality's game concept.",
     question: 'Ask the founder: What country inspired the world of Unreality?',
-    answer: 'Japan',
-    accepted: ['japan', 'japon', 'japón'],
     socialTask: 'Watch the short demo trailer at the booth.',
-    pin: '5454',
   },
   {
     id: 'cherrytree',
@@ -101,10 +86,7 @@ const startups = [
     description: 'Indie studio creating Project Node, a card-combat game experience.',
     mission: 'Meet the team behind Project Node.',
     question: 'Ask the founder: What is the name of Cherry Tree Studio\'s card-combat game?',
-    answer: 'Project Node',
-    accepted: ['project node', 'node'],
     socialTask: 'Ask to see one card or character from the game.',
-    pin: '6363',
   },
   {
     id: 'evveland',
@@ -117,10 +99,7 @@ const startups = [
     description: 'Gamified Telegram MiniApps that turn audiences into digital economies.',
     mission: 'Discover how brands can transform passive audiences into players.',
     question: 'Ask the founder: What is the core channel where Evveland builds gamified audience economies?',
-    answer: 'Telegram',
-    accepted: ['telegram', 'telegram miniapps', 'telegram mini apps'],
     socialTask: 'Open the Evveland demo MiniApp.',
-    pin: '7272',
   },
   {
     id: 'goldengamers',
@@ -133,10 +112,7 @@ const startups = [
     description: 'Uses video games to improve wellbeing and cognitive activity among older adults.',
     mission: 'Learn how games can serve older communities.',
     question: 'Ask the founder: What audience does Golden Gamers Go mainly serve?',
-    answer: 'seniors',
-    accepted: ['seniors', 'older adults', 'elderly', 'mayores', 'older people'],
     socialTask: 'Ask to see one example of a senior-friendly game session.',
-    pin: '8181',
   },
   {
     id: 'nomoretrolls',
@@ -149,10 +125,7 @@ const startups = [
     description: 'A third-person platform runner with humor, challenge and anti-troll energy.',
     mission: 'Find out how the team turns internet culture into gameplay.',
     question: 'Ask the founder: What type of game is No More Trolls building?',
-    answer: 'runner',
-    accepted: ['runner', 'platform runner', 'third-person runner', 'platformer'],
     socialTask: 'Watch one gameplay clip at the booth.',
-    pin: '9090',
   },
   {
     id: 'xperiencesvr',
@@ -165,10 +138,7 @@ const startups = [
     description: 'Skills training experiences powered by virtual reality and artificial intelligence.',
     mission: 'See how immersive simulations can train real-world skills.',
     question: 'Ask the founder: What two technologies does Xperiences VR combine for training?',
-    answer: 'VR and AI',
-    accepted: ['vr and ai', 'virtual reality and artificial intelligence', 'vr ai', 'ai and vr'],
     socialTask: 'Try or watch one VR training demo.',
-    pin: '0909',
   },
 ];
 
@@ -273,17 +243,23 @@ export default function MadridInGameQuestPrototype() {
   const current = startups.find((s) => s.id === selected);
   const dashboardStartup = startups.find((s) => s.id === dashboardStartupId) || startups[0];
 
-  function submitAnswer() {
+  async function submitAnswer() {
     if (!current) return;
-    const value = (answers[current.id] || '').toLowerCase().trim();
-    const valid = current.accepted.some((a) => value.includes(a.toLowerCase()));
-    if (!valid) {
-      setError('Not quite. Ask the founder again and try the secret answer.');
-      return;
-    }
-    completeQuest(current.id);
+    const value = (answers[current.id] || '').trim();
+    if (!value) return;
     setError('');
-    setScreen('success');
+    try {
+      const deviceId = localStorage.getItem('mig_device_id') || '';
+      const { data, error } = await supabase.functions.invoke('submit-answer', {
+        body: { startup_id: current.id, answer: value, device_id: deviceId },
+      });
+      if (error || !data) { setError('Could not reach server. Try again.'); return; }
+      if (!data.correct) { setError('Not quite. Ask the founder again and try the secret answer.'); return; }
+      completeQuest(current.id);
+      setScreen('success');
+    } catch {
+      setError('Could not reach server. Try again.');
+    }
   }
 
   function markSocialDone() {
@@ -1363,22 +1339,35 @@ function PinPad({ onSuccess, onBack }) {
   const [digits, setDigits] = useState([]);
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
+  const [checking, setChecking] = useState(false);
 
-  function press(d) {
-    if (digits.length >= 4) return;
+  async function press(d) {
+    if (digits.length >= 4 || checking) return;
     const next = [...digits, d];
     setDigits(next);
     setError(false);
     if (next.length === 4) {
       const code = next.join('');
-      if (code === '2025') { onSuccess('__mig_admin__'); return; }
-      const match = startups.find((s) => s.pin === code);
-      if (match) {
-        onSuccess(match.id);
-      } else {
+      setChecking(true);
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke('validate-pin', {
+          body: { pin: code },
+        });
+        if (fnError || !data || data.error) {
+          setShake(true);
+          setError(true);
+          setTimeout(() => { setDigits([]); setShake(false); }, 700);
+        } else if (data.type === 'organiser') {
+          onSuccess('__mig_admin__');
+        } else {
+          onSuccess(data.startup_id);
+        }
+      } catch {
         setShake(true);
         setError(true);
         setTimeout(() => { setDigits([]); setShake(false); }, 700);
+      } finally {
+        setChecking(false);
       }
     }
   }
@@ -1398,7 +1387,7 @@ function PinPad({ onSuccess, onBack }) {
           <Lock size={28} className="text-cyan-300" />
         </div>
         <h2 className="text-3xl font-black">Startup Access</h2>
-        <p className="text-white/60 mt-2 text-sm">Enter your 4-digit booth access code</p>
+        <p className="text-white/60 mt-2 text-sm">{checking ? 'Verifying…' : 'Enter your 4-digit booth access code'}</p>
       </div>
 
       <motion.div
