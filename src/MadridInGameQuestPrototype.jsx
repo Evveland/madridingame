@@ -1459,7 +1459,7 @@ const STATUS_COLORS = {
   'Closed':    'bg-white/20 text-white/40',
 };
 
-const TG_BASE = 'https://t.me/madridingame_bot/open';
+const TG_BASE = 'https://t.me/madridingame_bot/mig';
 
 function AllBoothQRs() {
   const [qrMap, setQrMap] = useState({});

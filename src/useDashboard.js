@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { supabase } from './supabase';
 
 // Telegram deep link — scanning opens the app inside Telegram, not a browser
-const APP_URL = 'https://t.me/madridingame_bot/open';
+const APP_URL = 'https://t.me/madridingame_bot/mig';
 
 function formFromStatic(s) {
   if (!s) return {};
