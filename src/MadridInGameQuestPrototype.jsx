@@ -375,7 +375,7 @@ export default function MadridInGameQuestPrototype() {
                     </div>
                   </div>
 
-                  <button onClick={() => setScreen('onboarding')} className="mt-4 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4 shadow-lg shadow-cyan-500/30 active:scale-[0.98] transition">
+                  <button onClick={() => setScreen(player?.profile ? 'map' : 'onboarding')} className="mt-4 w-full rounded-2xl bg-cyan-400 text-slate-950 font-black py-4 shadow-lg shadow-cyan-500/30 active:scale-[0.98] transition">
                     Start Quest
                   </button>
                   {hasAction('join_mig') ? (
