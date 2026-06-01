@@ -75,16 +75,29 @@ export function usePlayer() {
         // Keep device_id in sync so future non-Telegram lookups also work
         localStorage.setItem('mig_device_id', p.device_id);
       } else {
-        // New Telegram user — create with both identifiers
-        const { data: created } = await supabase
+        // New Telegram user — insert fresh.
+        // Use a new device_id if the current one is already owned by a different player
+        // (prevents two Telegram users on the same device merging records).
+        let newDeviceId = deviceId;
+        const { data: inserted, error: insertErr } = await supabase
           .from('players')
-          .upsert(
-            { device_id: deviceId, telegram_id: tg.id, telegram_name: tg.name },
-            { onConflict: 'device_id' }
-          )
+          .insert({ device_id: newDeviceId, telegram_id: tg.id, telegram_name: tg.name })
           .select()
           .single();
-        p = created;
+
+        if (insertErr?.code === '23505') {
+          // device_id conflict — generate a fresh one for this Telegram account
+          newDeviceId = crypto.randomUUID();
+          localStorage.setItem('mig_device_id', newDeviceId);
+          const { data: retried } = await supabase
+            .from('players')
+            .insert({ device_id: newDeviceId, telegram_id: tg.id, telegram_name: tg.name })
+            .select()
+            .single();
+          p = retried;
+        } else {
+          p = inserted;
+        }
       }
     } else {
       // No Telegram — fall back to device_id only
@@ -178,7 +191,8 @@ export function usePlayer() {
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-redemption', {
-        body: { device_id: deviceId, reward_name: reward.name, reward_cost: reward.xp },
+        // reward_cost intentionally omitted — server looks it up from its own REWARDS table
+        body: { device_id: deviceId, reward_name: reward.name },
       });
       if (error || !data?.code) return null;
       const row = { code: data.code, xp: reward.xp, used: data.used ?? false, reward_name: reward.name, reward_cost: reward.xp };
