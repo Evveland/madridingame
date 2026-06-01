@@ -174,6 +174,7 @@ export default function MadridInGameQuestPrototype() {
   const { player, telegramUser, completed, socialDone, actions, redemptionCodes, loading, completeQuest, completeSocial, saveProfile, generateRedemptionCode, submitContact, submitJoinMig, hasAction, actionXp, recordAction } = usePlayer();
   const [contactStartupId, setContactStartupId] = useState(null);
   const [joinType, setJoinType] = useState(null);
+  const [codeError, setCodeError] = useState(null);
   const [currentSocialLinks, setCurrentSocialLinks] = useState({});
   const [currentAcceptedAnswers, setCurrentAcceptedAnswers] = useState([]);
 
@@ -214,6 +215,11 @@ export default function MadridInGameQuestPrototype() {
       return () => clearTimeout(t);
     }
   }, [player]);
+
+  // Auto-fetch leaderboard whenever user navigates to it
+  useEffect(() => {
+    if (screen === 'leaderboard') fetchLeaderboard();
+  }, [screen]);
 
   // Live leaderboard: re-fetch whenever anyone completes a quest
   useEffect(() => {
@@ -424,7 +430,7 @@ export default function MadridInGameQuestPrototype() {
                     <p className="text-white/60 mt-1">Complete all startup quests to unlock the bonus.</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-black text-cyan-300">{completedCount}/10</div>
+                    <div className="text-2xl font-black text-cyan-300">{completedCount}/{startups.length}</div>
                     <div className="text-xs text-white/50">visited</div>
                   </div>
                 </div>
@@ -686,8 +692,10 @@ export default function MadridInGameQuestPrototype() {
                               disabled={isGenerating}
                               onClick={async () => {
                                 setGeneratingReward(r.name);
-                                await generateRedemptionCode(r);
+                                setCodeError(null);
+                                const result = await generateRedemptionCode(r);
                                 setGeneratingReward(null);
+                                if (!result) setCodeError(r.name);
                               }}
                               className="shrink-0 rounded-xl bg-cyan-400 text-slate-950 font-black px-3 py-2 text-xs active:scale-95 transition disabled:opacity-50"
                             >
@@ -698,6 +706,12 @@ export default function MadridInGameQuestPrototype() {
                           )}
                         </div>
 
+                        {/* Code generation error */}
+                        {codeError === r.name && (
+                          <div className="mx-4 mb-3 rounded-xl bg-rose-500/15 border border-rose-400/20 px-3 py-2 text-xs text-rose-300 font-bold text-center">
+                            Failed to generate code — tap "Get Code" to retry
+                          </div>
+                        )}
                         {/* Generated code display */}
                         {code && (
                           <div className={classNames('mx-4 mb-4 rounded-xl p-3 text-center', code.used ? 'bg-white/5' : 'bg-white text-slate-950')}>
@@ -787,10 +801,10 @@ export default function MadridInGameQuestPrototype() {
                           {/* Player info */}
                           <div className="flex-1 min-w-0">
                             <div className={classNames('font-black truncate', isMe ? 'text-slate-950' : 'text-white')}>
-                              {isMe ? 'You' : (row.profile || 'Explorer')}
+                              {isMe ? 'You' : (row.telegram_name || row.profile || 'Explorer')}
                             </div>
                             <div className={classNames('text-xs mt-0.5 flex items-center gap-2', isMe ? 'text-slate-700' : 'text-white/50')}>
-                              <span>{row.quests_completed}/10 quests</span>
+                              <span>{row.quests_completed}/{startups.length} quests</span>
                               {row.socials_completed > 0 && <span>· {row.socials_completed} social</span>}
                             </div>
                           </div>
@@ -929,7 +943,7 @@ function TopBar({ xp, completedCount, telegramUser }) {
         <Trophy size={18} className="text-cyan-300" />
         <div className="leading-none">
           <div className="font-black text-cyan-300">{xp}</div>
-          <div className="text-[10px] text-white/50">XP · {completedCount}/10</div>
+          <div className="text-[10px] text-white/50">XP · {completedCount}/{startups.length}</div>
         </div>
       </div>
     </div>
@@ -1482,10 +1496,12 @@ const JOIN_TYPE_COLORS = {
   'Cluster membership': 'bg-emerald-500/20 text-emerald-200 border-emerald-400/20',
   'Other':              'bg-white/10 text-white/60 border-white/10',
 };
+// Unified contact status set used across startup dashboard AND MiG admin
+const CONTACT_STATUSES = ['New', 'Follow up', 'Hot lead', 'Closed'];
 const STATUS_COLORS = {
   'New':       'bg-white/10 text-white/70',
-  'Contacted': 'bg-cyan-400 text-slate-950',
-  'Qualified': 'bg-emerald-400 text-slate-950',
+  'Follow up': 'bg-cyan-400 text-slate-950',
+  'Hot lead':  'bg-emerald-400 text-slate-950',
   'Closed':    'bg-white/20 text-white/40',
 };
 
@@ -1641,7 +1657,7 @@ function MigAdminScreen({ onSignOut }) {
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <div>
                         <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Reward</div>
-                        <div className="font-black text-xl mt-0.5">{rdm.result.reward.name}</div>
+                        <div className="font-black text-xl mt-0.5">{rdm.result.rewardName}</div>
                       </div>
                       <div className="text-right">
                         <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">XP</div>
@@ -1797,13 +1813,14 @@ function MigAdminScreen({ onSignOut }) {
                   <span className={classNames('rounded-full px-2 py-0.5 text-[10px] font-black border', JOIN_TYPE_COLORS[lead.type] || 'bg-white/10 text-white/60 border-white/10')}>
                     {lead.type}
                   </span>
-                  <select value={lead.status} onChange={e => db.updateStatus(lead.id, e.target.value)}
-                    className={classNames('rounded-full px-2 py-0.5 text-[10px] font-black outline-none cursor-pointer', STATUS_COLORS[lead.status] || STATUS_COLORS['New'])}>
-                    <option>New</option>
-                    <option>Contacted</option>
-                    <option>Qualified</option>
-                    <option>Closed</option>
-                  </select>
+                  <button
+                    onClick={() => {
+                      const next = CONTACT_STATUSES[(CONTACT_STATUSES.indexOf(lead.status || 'New') + 1) % CONTACT_STATUSES.length];
+                      db.updateStatus(lead.id, next);
+                    }}
+                    className={classNames('rounded-full px-2 py-0.5 text-[10px] font-black active:scale-95 transition', STATUS_COLORS[lead.status] || STATUS_COLORS['New'])}>
+                    {lead.status || 'New'} ›
+                  </button>
                 </div>
               </div>
               {lead.message && <p className="mt-2 text-xs text-white/50 leading-snug line-clamp-2">"{lead.message}"</p>}
