@@ -53,20 +53,50 @@ export function usePlayer() {
     const tg = getTelegramUser();
     if (tg) setTelegramUser(tg);
 
-    // Build upsert payload — include Telegram fields if available
-    const upsertPayload = { device_id: deviceId };
-    if (tg) {
-      upsertPayload.telegram_id   = tg.id;
-      upsertPayload.telegram_name = tg.name;
+    let p = null;
+
+    if (tg?.id) {
+      // Telegram user: look up by telegram_id first (works across all devices)
+      const { data: existing } = await supabase
+        .from('players')
+        .select()
+        .eq('telegram_id', tg.id)
+        .maybeSingle();
+
+      if (existing) {
+        // Known Telegram user — update their name and current device_id
+        const { data: updated } = await supabase
+          .from('players')
+          .update({ telegram_name: tg.name, device_id: deviceId })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        p = updated || existing;
+        // Keep device_id in sync so future non-Telegram lookups also work
+        localStorage.setItem('mig_device_id', p.device_id);
+      } else {
+        // New Telegram user — create with both identifiers
+        const { data: created } = await supabase
+          .from('players')
+          .upsert(
+            { device_id: deviceId, telegram_id: tg.id, telegram_name: tg.name },
+            { onConflict: 'device_id' }
+          )
+          .select()
+          .single();
+        p = created;
+      }
+    } else {
+      // No Telegram — fall back to device_id only
+      const { data: created } = await supabase
+        .from('players')
+        .upsert({ device_id: deviceId }, { onConflict: 'device_id' })
+        .select()
+        .single();
+      p = created;
     }
 
-    const { data: p, error } = await supabase
-      .from('players')
-      .upsert(upsertPayload, { onConflict: 'device_id' })
-      .select()
-      .single();
-
-    if (error || !p) { setLoading(false); return; }
+    if (!p) { setLoading(false); return; }
     setPlayer(p);
     playerRef.current = p;
 
